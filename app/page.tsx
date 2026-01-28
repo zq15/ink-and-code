@@ -1,74 +1,154 @@
-/*
- * :file description: 
- * :name: /ink-and-code/app/page.tsx
- * :author: PTC
- * :copyright: (c) 2026, Tungee
- * :date created: 2026-01-28 15:53:27
- * :last editor: PTC
- * :date last edited: 2026-01-28 15:59:47
- */
-import Image from "next/image";
+import Link from 'next/link';
+import { getAllPosts } from '@/lib/posts';
+import BlogCard from '@/app/components/BlogCard';
 
 export default function Home() {
+  const posts = getAllPosts();
+  const recentPosts = posts.slice(0, 4);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            Hello, i am ptc
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col">
+      <div className="bg-glow" />
+      
+      {/* 1. HERO SECTION */}
+      <section className="snap relative h-screen w-full overflow-hidden border-b border-card-border">
+        <div className="max-w-7xl mx-auto px-6 w-full relative z-10 flex flex-col items-center justify-center h-full">
+          <div className="flex flex-col items-center text-center space-y-12">
+            <div className="overflow-hidden py-2">
+              <h1 className="serif text-7xl md:text-[10rem] lg:text-[14rem] font-bold tracking-[-0.06em] text-foreground leading-[0.8] animate-reveal">
+                Ink<span className="text-primary tracking-tighter">&</span>Code
+              </h1>
+            </div>
+            
+            <div className="max-w-3xl space-y-8 animate-fade-up delay-2 opacity-0 [animation-fill-mode:forwards]">
+              <p className="text-xl md:text-3xl text-foreground leading-tight serif italic text-balance">
+                用代码书写思想，用技术表达创意。
+              </p>
+              <p className="text-muted md:text-lg tracking-wide leading-relaxed max-w-xl mx-auto">
+                记录编程探索、分享技术见解，连接技术与人文的边界。
+              </p>
+              
+              <div className="flex items-center justify-center gap-12 pt-6">
+                <Link
+                  href="#latest-articles"
+                  className="group relative text-xs md:text-sm tracking-[0.5em] uppercase text-primary font-bold transition-colors"
+                >
+                  READ BLOG
+                  <span className="absolute -bottom-2 left-0 w-full h-px bg-primary transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                </Link>
+                <Link
+                  href="#about-me"
+                  className="group relative text-xs md:text-sm tracking-[0.5em] uppercase text-muted hover:text-foreground font-bold transition-colors"
+                >
+                  ABOUT ME
+                  <span className="absolute -bottom-2 left-0 w-full h-px bg-card-border group-hover:bg-foreground transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Animated Background Text Decoration */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none -z-10 opacity-[0.02] flex items-center justify-center">
+          <span className="serif text-[35vw] font-bold select-none animate-float text-muted">CREATIVE</span>
         </div>
-      </main>
+
+        {/* Scroll Down Guide */}
+        <Link 
+          href="#latest-articles"
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 animate-fade-up delay-3 opacity-0 [animation-fill-mode:forwards] group cursor-pointer"
+        >
+          <span className="text-[10px] tracking-[0.5em] uppercase text-muted group-hover:text-primary transition-colors font-bold">EXPLORE</span>
+          <div className="w-px h-16 bg-linear-to-b from-primary/50 to-transparent group-hover:from-primary transition-all duration-500" />
+        </Link>
+      </section>
+
+      {/* 2. LATEST ARTICLES SECTION */}
+      <section id="latest-articles" className="snap relative h-screen px-6 overflow-hidden">
+        <div className="max-w-7xl mx-auto w-full h-full flex flex-col justify-center">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-16 gap-6">
+            <div className="space-y-4">
+              <h2 className="serif text-4xl md:text-6xl font-bold text-foreground tracking-tight">最新文章</h2>
+              <div className="flex items-center gap-6">
+                <div className="h-px w-16 bg-primary/30" />
+                <p className="text-muted text-[10px] tracking-[0.5em] uppercase font-bold">LATEST ARTICLES</p>
+              </div>
+            </div>
+            <Link 
+              href="/blog" 
+              className="group inline-flex items-center gap-4 text-[10px] tracking-[0.4em] uppercase text-muted hover:text-primary transition-all font-bold border-b border-card-border pb-2"
+            >
+              VIEW ALL
+              <span className="group-hover:translate-x-2 transition-transform duration-500">→</span>
+            </Link>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6 lg:gap-10">
+            {recentPosts.map((post) => (
+              <div key={post.slug}>
+                <BlogCard post={post} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. ABOUT ME / IDENTITY SECTION */}
+      <section id="about-me" className="snap relative h-screen px-6 border-t border-card-border overflow-hidden">
+        {/* Background Decoration */}
+        <div className="absolute -right-20 top-1/2 -translate-y-1/2 serif text-[25vw] opacity-[0.02] pointer-events-none select-none text-muted">
+          INFO
+        </div>
+
+        <div className="max-w-7xl mx-auto w-full h-full flex flex-col justify-center relative z-10">
+          <div className="grid lg:grid-cols-[1fr_1.1fr] gap-16 lg:gap-24 items-center">
+            <div className="space-y-12">
+              <div className="space-y-4">
+                <h2 className="serif text-5xl md:text-[8rem] font-bold text-foreground tracking-tighter leading-none">关于我</h2>
+                <div className="flex items-center gap-6">
+                  <div className="h-px w-20 bg-primary/30" />
+                  <p className="text-primary text-[10px] tracking-[0.5em] uppercase font-bold">THE IDENTITY & CRAFT</p>
+                </div>
+              </div>
+              
+              <p className="serif text-2xl md:text-4xl text-foreground leading-tight italic border-l-4 border-primary/20 pl-10 py-4">
+                "在逻辑的荒野中寻找美，<br />在代码的森林里书写诗。"
+              </p>
+              
+              <div className="space-y-8 text-muted text-lg md:text-xl leading-relaxed font-serif">
+                <p>
+                  我热衷于将技术与艺术融合。代码不仅是工具，更是思想的载体。
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {['Next.js', 'TypeScript', 'Design Systems', 'Creative Coding'].map(tag => (
+                  <span key={tag} className="px-6 py-2 rounded-full border border-card-border text-[9px] tracking-[0.3em] uppercase text-muted font-bold bg-card cursor-default">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              {[
+                { icon: '✒️', title: '深度输出', color: 'from-amber-500/10', desc: '坚持原创与深度，输出具有系统性的技术见解。' },
+                { icon: '🎨', title: '美学至上', color: 'from-purple-500/10', desc: '追求极致的排版与交互细节，让代码在屏幕上跳舞。' },
+              ].map((item) => (
+                <div key={item.title} className={`p-10 md:p-12 rounded-[2.5rem] bg-linear-to-br ${item.color} to-transparent border border-card-border group relative overflow-hidden shadow-lg`}>
+                  <div className="absolute -right-2 -top-2 p-8 text-6xl opacity-5 group-hover:opacity-10 transition-all duration-700 select-none">
+                    {item.icon}
+                  </div>
+                  <div className="relative z-10 space-y-4">
+                    <h3 className="serif text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-500">{item.title}</h3>
+                    <p className="text-muted text-base leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
