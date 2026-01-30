@@ -22,9 +22,7 @@ export default function ChatAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { messages, sendMessage, status, error } = useChat({
-    api: '/api/chat',
-  });
+  const { messages, sendMessage, status, error } = useChat();
 
   const isLoading = status === 'streaming' || status === 'submitted';
 

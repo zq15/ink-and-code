@@ -115,7 +115,7 @@ async function createCategoryFetcher(
   url: string,
   { arg }: { arg: Omit<CategoryInput, 'id'> }
 ) {
-  const res = await post<Category>(url, arg);
+  const res = await post<Category>(url, arg as unknown as Record<string, unknown>);
   return res.data;
 }
 
@@ -130,7 +130,7 @@ async function updateCategoryFetcher(
   url: string,
   { arg }: { arg: CategoryInput & { id: string } }
 ) {
-  const res = await post<Category>(url, arg);
+  const res = await post<Category>(url, arg as unknown as Record<string, unknown>);
   return res.data;
 }
 
@@ -145,7 +145,7 @@ async function deleteCategoryFetcher(
   url: string,
   { arg }: { arg: { id: string } }
 ) {
-  await post(url, arg);
+  await post(url, arg as unknown as Record<string, unknown>);
 }
 
 export function useDeleteCategory() {

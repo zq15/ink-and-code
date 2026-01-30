@@ -73,22 +73,23 @@ export async function authFetcher<T>(url: string): Promise<T> {
 /**
  * POST 请求
  */
-export async function post<T>(
+export async function post<T, D extends object = Record<string, unknown>>(
   url: string,
-  data: Record<string, unknown>,
+  data: D,
   options?: FetcherOptions
 ): Promise<ApiResponse<T>> {
   const apiKey = getApiKey();
+  const { body: _, headers, ...restOptions } = options || {};
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(apiKey && { 'x-api-key': apiKey }),
-      ...options?.headers,
+      ...headers,
     },
     body: JSON.stringify(data),
-    ...options,
+    ...restOptions,
   });
 
   const json: ApiResponse<T> = await res.json();
@@ -107,13 +108,15 @@ export async function get<T>(
   url: string,
   options?: FetcherOptions
 ): Promise<ApiResponse<T>> {
+  const { body: _, headers, ...restOptions } = options || {};
+
   const res = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
-      ...options?.headers,
+      ...headers,
     },
-    ...options,
+    ...restOptions,
   });
 
   const json: ApiResponse<T> = await res.json();

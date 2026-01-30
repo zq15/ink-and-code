@@ -3,17 +3,7 @@
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { fetcher, post, ApiError } from '@/lib/fetcher';
-
-/**
- * 分类类型
- */
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  icon: string | null;
-  color: string | null;
-}
+import type { Category } from './use-categories';
 
 /**
  * 文章类型
@@ -136,7 +126,7 @@ async function createArticleFetcher(
   url: string,
   { arg }: { arg: Omit<ArticleInput, 'id'> }
 ) {
-  const res = await post<Article>(url, arg);
+  const res = await post<Article>(url, arg as unknown as Record<string, unknown>);
   return res.data;
 }
 
@@ -151,7 +141,7 @@ async function updateArticleFetcher(
   url: string,
   { arg }: { arg: ArticleInput & { id: string } }
 ) {
-  const res = await post<Article>(url, arg);
+  const res = await post<Article>(url, arg as unknown as Record<string, unknown>);
   return res.data;
 }
 
@@ -166,7 +156,7 @@ async function deleteArticleFetcher(
   url: string,
   { arg }: { arg: { id: string } }
 ) {
-  await post(url, arg);
+  await post(url, arg as unknown as Record<string, unknown>);
 }
 
 export function useDeleteArticle() {

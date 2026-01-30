@@ -48,7 +48,7 @@ export default async function BlogPage() {
           icon: post.category.icon,
         }
       : null,
-    date: post.createdAt.toISOString(),
+    createdAt: post.createdAt.toISOString(),
   }));
 
   return <BlogPageClient initialPosts={formattedPosts} />;
