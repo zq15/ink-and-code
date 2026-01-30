@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // 用于 migrations（可选）
+}
+
+// 分类模型（支持树形结构）
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  icon      String?  // 可选的图标（emoji 或图标名）
+  color     String?  // 可选的颜色
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // 树形结构
+  parentId  String?   @map("parent_id")
+  parent    Category? @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CategoryTree")
+  
+  posts     Post[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// 文章模型
+model Post {
+  id         String    @id @default(uuid())
+  slug       String    @unique
+  title      String
+  content    String    @db.Text
+  excerpt    String?
+  coverImage String?   @map("cover_image")
+  tags       String[]  @default([])
+  published  Boolean   @default(false)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  
+  // 分类关联
+  categoryId String?   @map("category_id")
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([categoryId])
+  @@index([published])
+  @@index([title])
+  @@map("posts")
+}

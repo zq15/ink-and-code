@@ -1,9 +1,18 @@
+/*
+ * :file description: 
+ * :name: /ink-and-code/app/page.tsx
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ * :date created: 2026-01-28 15:53:27
+ * :last editor: PTC
+ * :date last edited: 2026-01-30 10:29:21
+ */
 import Link from 'next/link';
-import { getAllPosts } from '@/lib/posts';
+import { getAllPostsAsync } from '@/lib/posts';
 import BlogCard from '@/app/components/BlogCard';
 
-export default function Home() {
-  const posts = getAllPosts();
+export default async function Home() {
+  const posts = await getAllPostsAsync();
   const recentPosts = posts.slice(0, 4);
 
   return (
@@ -83,13 +92,35 @@ export default function Home() {
             </Link>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6 lg:gap-10">
-            {recentPosts.map((post) => (
-              <div key={post.slug}>
-                <BlogCard post={post} />
+          {recentPosts.length > 0 ? (
+            <div className="grid md:grid-cols-2 gap-6 lg:gap-10">
+              {recentPosts.map((post) => (
+                <div key={post.slug}>
+                  <BlogCard post={post} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-24 h-24 mb-8 rounded-3xl bg-primary/5 border border-primary/10 flex items-center justify-center rotate-3">
+                <span className="text-4xl -rotate-3">✍️</span>
               </div>
-            ))}
-          </div>
+              <h3 className="serif text-2xl md:text-3xl font-bold text-foreground mb-4">
+                还没有文章
+              </h3>
+              <p className="text-muted max-w-md mb-8 leading-relaxed">
+                这里还是一片空白，正等待着你的第一篇创作。<br />
+                用文字记录灵感，让思想在代码中绽放。
+              </p>
+              <Link
+                href="/admin"
+                className="group inline-flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground rounded-2xl text-sm font-bold tracking-wider uppercase hover:bg-primary/90 transition-all duration-300 shadow-lg shadow-primary/20"
+              >
+                <span>开始创作</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -112,7 +143,7 @@ export default function Home() {
               </div>
               
               <p className="serif text-2xl md:text-4xl text-foreground leading-tight italic border-l-4 border-primary/20 pl-10 py-4">
-                "在逻辑的荒野中寻找美，<br />在代码的森林里书写诗。"
+                &quot;在逻辑的荒野中寻找美，<br />在代码的森林里书写诗。&quot;
               </p>
               
               <div className="space-y-8 text-muted text-lg md:text-xl leading-relaxed font-serif">

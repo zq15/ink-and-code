@@ -4,6 +4,9 @@ import "./globals.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { SWRProvider } from "./components/SWRProvider";
+import { ConfirmProvider } from "./components/ConfirmDialog";
+import ChatAssistant from "./components/ChatAssistant";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -49,11 +52,16 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased flex flex-col min-h-screen">
-        <ThemeProvider>
-          <Header />
-          <main className="grow">{children}</main>
-          <Footer />
-        </ThemeProvider>
+        <SWRProvider>
+          <ThemeProvider>
+            <ConfirmProvider>
+              <Header />
+              <main className="grow">{children}</main>
+              <Footer />
+              <ChatAssistant />
+            </ConfirmProvider>
+          </ThemeProvider>
+        </SWRProvider>
       </body>
     </html>
   );

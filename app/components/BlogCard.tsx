@@ -13,7 +13,7 @@ export default function BlogCard({ post }: BlogCardProps) {
 
   return (
     <Link 
-      href={`/blog/${post.slug}`}
+      href={`/blog/${post.id}`}
       className="group block relative p-6 md:p-8 rounded-3xl border border-card-border bg-card hover:border-primary/30 transition-all duration-700 h-full overflow-hidden shadow-sm hover:shadow-lg"
     >
       <article className="flex flex-col h-full space-y-4 relative z-10">

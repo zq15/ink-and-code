@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* 使用 data-theme 属性检测暗色模式 */
+@custom-variant dark (&:is([data-theme="dark"] *));
 
 /* 暗色主题（默认） */
 :root,
@@ -7,9 +11,23 @@
   --foreground: #ececec;
   --card: #0a0a0a;
   --card-border: #1a1a1a;
+  --card-foreground: #ececec;
   --primary: #d4a373;
+  --primary-foreground: #030303;
   --primary-glow: rgba(212, 163, 115, 0.15);
+  --secondary: #1a1a1a;
+  --secondary-foreground: #ececec;
   --muted: #888888;
+  --muted-foreground: #888888;
+  --accent: #1a1a1a;
+  --accent-foreground: #ececec;
+  --destructive: #ef4444;
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #d4a373;
+  --radius: 0.5rem;
+  --popover: #0a0a0a;
+  --popover-foreground: #ececec;
   --glass-bg: rgba(3, 3, 3, 0.8);
   --glass-border: rgba(255, 255, 255, 0.03);
   --noise-opacity: 0.02;
@@ -23,9 +41,22 @@
   --foreground: #1a1a1a;
   --card: #ffffff;
   --card-border: #e5e5e5;
+  --card-foreground: #1a1a1a;
   --primary: #b8860b;
+  --primary-foreground: #ffffff;
   --primary-glow: rgba(184, 134, 11, 0.1);
+  --secondary: #f4f4f5;
+  --secondary-foreground: #1a1a1a;
   --muted: #6b7280;
+  --muted-foreground: #6b7280;
+  --accent: #f4f4f5;
+  --accent-foreground: #1a1a1a;
+  --destructive: #ef4444;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #b8860b;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
   --glass-bg: rgba(255, 255, 255, 0.9);
   --glass-border: rgba(0, 0, 0, 0.05);
   --noise-opacity: 0.015;
@@ -40,6 +71,39 @@
   --color-muted: var(--muted);
   --font-sans: var(--font-sans);
   --font-serif: var(--font-serif);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
 * {
@@ -53,8 +117,6 @@ html:has(.snap) {
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: var(--font-sans);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -62,6 +124,8 @@ body {
   overflow-x: hidden;
   scrollbar-width: none;
   transition: background-color 0.5s ease, color 0.5s ease;
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 body::-webkit-scrollbar {
@@ -121,18 +185,31 @@ body::before {
 }
 
 /* 自定义滚动条 */
-::-webkit-scrollbar {
+.custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
-::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--card-border);
   border-radius: 10px;
 }
-::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
+}
+
+/* Tiptap 编辑器容器优化 */
+.tiptap-editor-content .tiptap {
+  min-height: 500px;
+  padding-bottom: 200px;
+}
+
+.tiptap-editor-content .tiptap p.is-editor-empty:first-child::before {
+  color: var(--muted);
+  opacity: 0.3;
+  font-style: italic;
+  font-family: var(--font-serif);
 }
 
 /* 样式类 */
@@ -193,15 +270,15 @@ body::before {
 
 /* Markdown 样式增强 */
 .prose {
-  line-height: 1.8;
-  font-size: 1.125rem;
+  line-height: 1.7;
+  font-size: 1rem;
 }
 
 .prose h1, .prose h2, .prose h3 {
   font-family: var(--font-serif);
   color: var(--foreground);
-  margin-top: 2em;
-  margin-bottom: 1em;
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
 }
 
 pre {
@@ -216,4 +293,243 @@ pre code {
   font-size: 0.9rem !important;
   padding: 1.5rem !important;
   display: block;
+}
+
+/* Tiptap 编辑器样式 */
+.tiptap {
+  outline: none;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted);
+  pointer-events: none;
+  height: 0;
+}
+
+.tiptap h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 1.5rem 0 1rem;
+  font-family: var(--font-serif);
+}
+
+.tiptap h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 1.25rem 0 0.75rem;
+  font-family: var(--font-serif);
+}
+
+.tiptap h3 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem;
+  font-family: var(--font-serif);
+}
+
+.tiptap p {
+  margin: 0.75rem 0;
+  line-height: 1.7;
+}
+
+.tiptap ul {
+  padding-left: 1.5rem;
+  margin: 0.75rem 0;
+  list-style-type: disc;
+}
+
+.tiptap ol {
+  padding-left: 1.5rem;
+  margin: 0.75rem 0;
+  list-style-type: decimal;
+}
+
+.tiptap li {
+  margin: 0.25rem 0;
+  display: list-item;
+}
+
+.tiptap li p {
+  margin: 0;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.tiptap code {
+  background: var(--card);
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  color: var(--primary);
+}
+
+.tiptap pre {
+  background: var(--card) !important;
+  border: 1px solid var(--card-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.tiptap pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid var(--card-border);
+  margin: 2rem 0;
+}
+
+.tiptap a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+/* Tiptap 渲染器样式（博客页面） */
+.tiptap-content h1 {
+  font-size: 2.25rem;
+  font-weight: bold;
+  margin: 1.5rem 0 0.75rem;
+  font-family: var(--font-serif);
+  color: var(--foreground);
+}
+
+.tiptap-content h2 {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin: 2rem 0 0.75rem;
+  font-family: var(--font-serif);
+  color: var(--foreground);
+}
+
+.tiptap-content h3 {
+  font-size: 1.35rem;
+  font-weight: bold;
+  margin: 1.5rem 0 0.5rem;
+  font-family: var(--font-serif);
+  color: var(--foreground);
+}
+
+.tiptap-content p {
+  margin: 0.85rem 0;
+  line-height: 1.7;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.tiptap-content ul {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+  color: var(--muted);
+  list-style-type: disc;
+}
+
+.tiptap-content ol {
+  padding-left: 1.5rem;
+  margin: 1rem 0;
+  color: var(--muted);
+  list-style-type: decimal;
+}
+
+.tiptap-content li {
+  margin: 0.5rem 0;
+  line-height: 1.7;
+  display: list-item;
+}
+
+.tiptap-content li p {
+  margin: 0;
+}
+
+.tiptap-content blockquote {
+  border-left: 2px solid var(--primary);
+  padding: 0.5rem 1.5rem;
+  margin: 2rem 0;
+  background: var(--card)/30;
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-style: italic;
+}
+
+.tiptap-content blockquote p {
+  color: var(--muted);
+  margin: 0.5rem 0;
+}
+
+.tiptap-content code {
+  background: var(--card);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+  color: var(--primary);
+}
+
+.tiptap-content pre {
+  background: var(--card) !important;
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  overflow-x: auto;
+}
+
+.tiptap-content pre code {
+  background: none;
+  padding: 0;
+  color: var(--foreground);
+  font-size: 0.9rem;
+}
+
+.tiptap-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.tiptap-content hr {
+  border: none;
+  border-top: 1px solid var(--card-border);
+  margin: 3rem 0;
+}
+
+.tiptap-content a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.tiptap-content a:hover {
+  text-decoration: underline;
+}
+
+.tiptap-content strong {
+  color: var(--foreground);
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

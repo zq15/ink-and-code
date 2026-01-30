@@ -1,4 +1,15 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+
 export default function Footer() {
+  const pathname = usePathname();
+  
+  // 在 blog 页面不显示 footer
+  if (pathname.startsWith('/blog')) {
+    return null;
+  }
+
   return (
     <footer className="border-t border-card-border bg-background">
       <div className="max-w-7xl mx-auto px-6 py-16">

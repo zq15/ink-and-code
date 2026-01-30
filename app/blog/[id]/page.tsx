@@ -1,23 +1,20 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getPostBySlug, getAllPostSlugs } from '@/lib/posts';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import rehypeSlug from 'rehype-slug';
+import { getPostByIdAsync, getAllPostsAsync } from '@/lib/posts';
+import TiptapRenderer from '@/app/components/TiptapRenderer';
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ id: string }>;
 }
 
 export async function generateStaticParams() {
-  const slugs = getAllPostSlugs();
-  return slugs.map((slug) => ({ slug }));
+  const posts = await getAllPostsAsync();
+  return posts.map((post) => ({ id: post.id }));
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const { id } = await params;
+  const post = await getPostByIdAsync(id);
   
   if (!post) {
     return { title: '文章未找到 | Ink & Code' };
@@ -30,8 +27,8 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function PostPage({ params }: PageProps) {
-  const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const { id } = await params;
+  const post = await getPostByIdAsync(id);
 
   if (!post) {
     notFound();
@@ -85,24 +82,7 @@ export default async function PostPage({ params }: PageProps) {
               )}
             </header>
 
-            <div className="prose max-w-none
-              prose-p:text-muted prose-p:leading-relaxed prose-p:text-lg
-              prose-headings:serif prose-headings:text-foreground
-              prose-h2:text-3xl prose-h2:mt-16 prose-h2:mb-8
-              prose-h3:text-2xl prose-h3:mt-12 prose-h3:mb-6
-              prose-strong:text-foreground
-              prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-              prose-blockquote:border-l-primary/30 prose-blockquote:bg-card prose-blockquote:px-8 prose-blockquote:py-1 prose-blockquote:rounded-r-lg
-              prose-code:text-primary prose-code:bg-card prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none
-              prose-pre:bg-card prose-pre:border prose-pre:border-card-border
-            ">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight, rehypeSlug]}
-              >
-                {post.content}
-              </ReactMarkdown>
-            </div>
+            <TiptapRenderer content={post.content} />
 
             <footer className="mt-32 pt-16 border-t border-card-border">
               <div className="flex flex-col md:flex-row justify-between items-center gap-12">
