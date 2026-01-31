@@ -34,8 +34,8 @@ jobs:
             # 生成 Prisma Client
             pnpm prisma generate
             
-            # 构建项目
-            pnpm build
+            # 构建项目（包含数据库同步）
+            pnpm build:deploy
             
             # 重启 PM2 服务（如果使用 PM2）
             pm2 restart ink-and-code || pm2 start pnpm --name "ink-and-code" -- start
