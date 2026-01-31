@@ -2,6 +2,9 @@
   "name": "ink-and-code",
   "version": "0.1.0",
   "private": true,
+  "pnpm": {
+    "ignoredBuiltDependencies": ["sharp", "unrs-resolver"]
+  },
   "scripts": {
     "start": "next dev",
     "build": "prisma generate && prisma db push && next build",
