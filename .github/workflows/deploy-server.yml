@@ -36,9 +36,6 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      - name: 修改端口配置
-        run: sed -i 's/start -H 0.0.0.0 -p [0-9]*/start -H 0.0.0.0 -p 3000/' ecosystem.config.js
-
       - name: 打包部署文件
         run: |
           mkdir -p deploy

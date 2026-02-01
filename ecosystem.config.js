@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'ink-and-code',
       script: 'node_modules/next/dist/bin/next',
-      args: 'start -p 80',
+      args: 'start -H 0.0.0.0 -p 3000',
       cwd: '/ptc/ink-and-code',
       instances: 1,
       exec_mode: 'fork',
