@@ -4,7 +4,8 @@
  * 使用方法：
  * 1. 确保已配置 DATABASE_URL 环境变量
  * 2. 运行 npx prisma db push 创建数据库表
- * 3. 运行 npx tsx scripts/migrate-posts.ts
+ * 3. 运行 npx tsx scripts/migrate-posts.ts <userId>
+ *    其中 userId 是要关联文章的用户 ID
  */
 
 import fs from 'fs';
@@ -27,6 +28,10 @@ interface PostData {
 }
 
 async function getMarkdownPosts(): Promise<PostData[]> {
+  if (!fs.existsSync(postsDirectory)) {
+    return [];
+  }
+  
   const fileNames = fs.readdirSync(postsDirectory);
   
   return fileNames
@@ -59,8 +64,22 @@ async function getMarkdownPosts(): Promise<PostData[]> {
     });
 }
 
-async function migrate() {
+async function migrate(userId: string) {
   console.log('🚀 开始迁移文章...\n');
+
+  // 验证用户存在
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, email: true },
+  });
+
+  if (!user) {
+    console.error(`❌ 用户不存在: ${userId}`);
+    console.log('\n请先登录创建用户，或指定正确的用户 ID');
+    process.exit(1);
+  }
+
+  console.log(`👤 目标用户: ${user.name || user.email} (${user.id})\n`);
 
   try {
     const posts = await getMarkdownPosts();
@@ -72,38 +91,40 @@ async function migrate() {
 
     for (const post of posts) {
       try {
-        const result = await prisma.post.upsert({
-          where: { slug: post.slug },
-          update: {
-            title: post.title,
-            content: post.content,
-            excerpt: post.excerpt,
-            tags: post.tags,
-            coverImage: post.coverImage,
-            // 不更新 published 和 createdAt，保留现有值
-          },
-          create: {
-            slug: post.slug,
-            title: post.title,
-            content: post.content,
-            excerpt: post.excerpt,
-            tags: post.tags,
-            coverImage: post.coverImage,
-            published: post.published,
-            createdAt: post.createdAt,
-          },
+        // 检查该用户下是否已有此 slug 的文章
+        const existing = await prisma.post.findFirst({
+          where: { userId, slug: post.slug },
         });
 
-        // 检查是创建还是更新
-        const existing = await prisma.post.findUnique({
-          where: { slug: post.slug },
-          select: { createdAt: true },
-        });
-        
-        if (existing && existing.createdAt.getTime() === result.createdAt.getTime()) {
+        if (existing) {
+          // 更新
+          await prisma.post.update({
+            where: { id: existing.id },
+            data: {
+              title: post.title,
+              content: post.content,
+              excerpt: post.excerpt,
+              tags: post.tags,
+              coverImage: post.coverImage,
+            },
+          });
           updated++;
           console.log(`✏️  更新: ${post.title} (${post.slug})`);
         } else {
+          // 创建
+          await prisma.post.create({
+            data: {
+              userId,
+              slug: post.slug,
+              title: post.title,
+              content: post.content,
+              excerpt: post.excerpt,
+              tags: post.tags,
+              coverImage: post.coverImage,
+              published: post.published,
+              createdAt: post.createdAt,
+            },
+          });
           created++;
           console.log(`✅ 创建: ${post.title} (${post.slug})`);
         }
@@ -126,5 +147,18 @@ async function migrate() {
   }
 }
 
+// 获取命令行参数
+const userId = process.argv[2];
+
+if (!userId) {
+  console.log('使用方法: npx tsx scripts/migrate-posts.ts <userId>');
+  console.log('');
+  console.log('userId: 要将文章迁移到的用户 ID');
+  console.log('');
+  console.log('你可以通过以下 SQL 查询用户 ID:');
+  console.log('  SELECT id, name, email FROM users;');
+  process.exit(1);
+}
+
 // 运行迁移
-migrate();
+migrate(userId);
