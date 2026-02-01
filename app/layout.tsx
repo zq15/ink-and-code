@@ -6,6 +6,7 @@ import Footer from "./components/Footer";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SWRProvider } from "./components/SWRProvider";
 import { ConfirmProvider } from "./components/ConfirmDialog";
+import AuthProvider from "./components/AuthProvider";
 import ChatAssistant from "./components/ChatAssistant";
 
 const inter = Inter({
@@ -52,16 +53,18 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased flex flex-col min-h-screen">
-        <SWRProvider>
-          <ThemeProvider>
-            <ConfirmProvider>
-              <Header />
-              <main className="grow">{children}</main>
-              <Footer />
-              <ChatAssistant />
-            </ConfirmProvider>
-          </ThemeProvider>
-        </SWRProvider>
+        <AuthProvider>
+          <SWRProvider>
+            <ThemeProvider>
+              <ConfirmProvider>
+                <Header />
+                <main className="grow">{children}</main>
+                <Footer />
+                <ChatAssistant />
+              </ConfirmProvider>
+            </ThemeProvider>
+          </SWRProvider>
+        </AuthProvider>
       </body>
     </html>
   );

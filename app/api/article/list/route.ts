@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/prisma';
-import { success, ApiError } from '@/lib/api-response';
+import { success, ApiError, requireAuth } from '@/lib/api-response';
 
 /**
  * GET /api/article/list
- * 获取文章列表
+ * 获取当前用户的文章列表（需要登录）
  * Query params:
  *   - published: 'true' | 'false' - 筛选发布状态
  *   - categoryId: string - 筛选分类
@@ -13,6 +13,10 @@ import { success, ApiError } from '@/lib/api-response';
  */
 export async function GET(request: Request) {
   try {
+    // 验证登录状态
+    const { userId, error: authError } = await requireAuth();
+    if (authError) return authError;
+
     const { searchParams } = new URL(request.url);
     const published = searchParams.get('published');
     const categoryId = searchParams.get('categoryId');
@@ -21,8 +25,10 @@ export async function GET(request: Request) {
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
     const skip = (page - 1) * limit;
 
-    // 构建查询条件
-    const where: Record<string, unknown> = {};
+    // 构建查询条件 - 只查询当前用户的文章
+    const where: Record<string, unknown> = {
+      userId: userId,
+    };
 
     if (published !== null) {
       where.published = published === 'true';

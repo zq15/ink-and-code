@@ -13,16 +13,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { mutate } from 'swr';
+import { useSession, signOut } from 'next-auth/react';
 import {
   useArticle,
   useCreateArticle,
   useUpdateArticle,
   useDeleteArticle,
   useCategoryList,
-  type Category,
 } from '@/lib/hooks';
 import { ApiError } from '@/lib/fetcher';
-import { ChevronDown, Eye, EyeOff, Trash2, Home, Settings, Tag, Layout, FilePlus, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Trash2, Home, Tag, Layout, FilePlus, PanelLeftClose, PanelLeft, LogOut, User, Link2 } from 'lucide-react';
 import DocTree from '@/app/components/DocTree';
 import { useConfirm } from '@/app/components/ConfirmDialog';
 
@@ -56,11 +56,10 @@ export default function AdminPage() {
   // 确认弹窗
   const confirm = useConfirm();
 
-  // 认证状态
-  const [apiKey, setApiKey] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  // 使用 NextAuth session 进行认证
+  const { data: session, status } = useSession();
+  const isAuthenticated = !!session?.user;
+  const isCheckingAuth = status === 'loading';
 
   // 侧边栏状态
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -82,7 +81,7 @@ export default function AdminPage() {
   const { data: articleData, isLoading: articleLoading } = useArticle(
     selectedType === 'article' ? selectedId : null
   );
-  const { data: categories } = useCategoryList();
+  const { data: _categories } = useCategoryList();
   const { trigger: createArticle, isMutating: isCreating } = useCreateArticle();
   const { trigger: updateArticle, isMutating: isUpdating } = useUpdateArticle();
   const { trigger: deleteArticle } = useDeleteArticle();
@@ -97,44 +96,6 @@ export default function AdminPage() {
   useEffect(() => {
     selectedIdRef.current = selectedId;
   }, [selectedId]);
-
-  // 从 localStorage 恢复并验证 API Key
-  useEffect(() => {
-    const verifyStoredKey = async () => {
-      const savedKey = localStorage.getItem('admin_api_key');
-      if (!savedKey) {
-        setIsCheckingAuth(false);
-        return;
-      }
-
-      try {
-        const res = await fetch('/api/auth/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': savedKey,
-          },
-        });
-
-        const json = await res.json();
-
-        if (res.ok && json.code < 400) {
-          setApiKey(savedKey);
-          setIsAuthenticated(true);
-        } else {
-          // Key 无效，清除
-          localStorage.removeItem('admin_api_key');
-        }
-      } catch (error) {
-        console.error('Failed to verify stored key:', error);
-        localStorage.removeItem('admin_api_key');
-      }
-
-      setIsCheckingAuth(false);
-    };
-
-    verifyStoredKey();
-  }, []);
 
   // 加载文章数据到表单
   useEffect(() => {
@@ -160,18 +121,15 @@ export default function AdminPage() {
     setTimeout(() => setMessage(null), 2000);
   }, []);
 
-  // 处理 401 未授权错误
-  const handleUnauthorized = useCallback(() => {
-    localStorage.removeItem('admin_api_key');
-    setApiKey('');
-    setIsAuthenticated(false);
-    showMessage('error', '你无权限操作');
-  }, [showMessage]);
-
   // 检查是否是 401 错误
   const isUnauthorizedError = useCallback((error: unknown): boolean => {
     return error instanceof ApiError && error.code === 401;
   }, []);
+
+  // 处理未授权错误
+  const handleUnauthorized = useCallback(() => {
+    showMessage('error', '操作失败，请重新登录');
+  }, [showMessage]);
 
   // 生成 slug
   const generateSlug = useCallback((title: string) => {
@@ -212,45 +170,9 @@ export default function AdminPage() {
     }
   }, [updateArticle, generateSlug, isUnauthorizedError, handleUnauthorized]);
 
-  // 验证并保存 API Key
-  const handleLogin = async () => {
-    if (!apiKey.trim()) {
-      showMessage('error', '请输入 API Key');
-      return;
-    }
-
-    setIsLoggingIn(true);
-    try {
-      const res = await fetch('/api/auth/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-      });
-
-      const json = await res.json();
-
-      if (!res.ok || json.code >= 400) {
-        showMessage('error', 'API Key 无效');
-        return;
-      }
-
-      localStorage.setItem('admin_api_key', apiKey);
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error('Login failed:', error);
-      showMessage('error', '登录失败，请重试');
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
-
   // 退出登录
   const handleLogout = () => {
-    localStorage.removeItem('admin_api_key');
-    setApiKey('');
-    setIsAuthenticated(false);
+    signOut({ callbackUrl: '/' });
   };
 
   // 处理表单变化
@@ -397,7 +319,7 @@ export default function AdminPage() {
     );
   }
 
-  // 未认证
+  // 未认证 - 显示登录提示
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center px-6 pt-20">
@@ -408,38 +330,17 @@ export default function AdminPage() {
             
             <div className="relative z-10">
               <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 border border-primary/20 shadow-sm">
-                <Settings className="w-7 h-7 text-primary" />
+                <User className="w-7 h-7 text-primary" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight mb-2">工作空间登录</h1>
-              <p className="text-muted/60 text-sm mb-8 serif italic">请输入您的 API Key 以访问管理后台</p>
+              <h1 className="text-2xl font-bold tracking-tight mb-2">需要登录</h1>
+              <p className="text-muted/60 text-sm mb-8 serif italic">请登录后访问管理后台</p>
               
-              {/* 错误提示 */}
-              {message && message.type === 'error' && (
-                <div className="mb-4 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm font-medium">
-                  {message.text}
-                </div>
-              )}
-              
-              <div className="space-y-4">
-                <div className="relative group">
-                  <input
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !isLoggingIn && handleLogin()}
-                    disabled={isLoggingIn}
-                    placeholder="请输入管理密钥..."
-                    className="w-full px-5 py-3.5 bg-background/50 border border-card-border rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary/40 transition-all placeholder:text-muted/20 shadow-inner disabled:opacity-50"
-                  />
-                </div>
-                <button
-                  onClick={handleLogin}
-                  disabled={isLoggingIn}
-                  className="w-full py-4 bg-primary text-primary-foreground rounded-2xl text-[11px] font-extrabold uppercase tracking-[0.2em] hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98] shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoggingIn ? '验证中...' : '进入工作空间'}
-                </button>
-              </div>
+              <Link
+                href="/login"
+                className="block w-full py-4 bg-primary text-primary-foreground rounded-2xl text-[11px] font-extrabold uppercase tracking-[0.2em] hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98] shadow-md text-center"
+              >
+                前往登录
+              </Link>
             </div>
           </div>
         </div>
@@ -476,20 +377,50 @@ export default function AdminPage() {
 
         {/* 底部功能栏 */}
         <div className="p-5 border-t border-card-border/40 bg-card/20 w-72">
+          {/* 用户信息 */}
+          {session?.user && (
+            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-card-border/40">
+              {session.user.image ? (
+                <img
+                  src={session.user.image}
+                  alt={session.user.name || 'User'}
+                  className="w-9 h-9 rounded-xl ring-2 ring-card-border"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center ring-2 ring-card-border">
+                  <User className="w-4 h-4 text-primary" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{session.user.name || '用户'}</p>
+                <p className="text-[10px] text-muted truncate">{session.user.email}</p>
+              </div>
+            </div>
+          )}
+          <div className="mb-3">
+            <Link
+              href="/admin/settings"
+              className="flex items-center justify-center gap-2 px-3 py-3 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl transition-all shadow-sm"
+            >
+              <Link2 className="w-4 h-4" />
+              <span>生成我的主页</span>
+            </Link>
+            <p className="text-[10px] text-muted text-center mt-1.5">创建专属链接，分享给朋友</p>
+          </div>
           <div className="flex items-center justify-between gap-3">
             <Link
               href="/"
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted hover:text-foreground hover:bg-card-border/40 rounded-xl transition-all border border-card-border/40 bg-background/40 shadow-sm"
             >
               <Home className="w-3.5 h-3.5" />
-              <span>前台首页</span>
+              <span>首页</span>
             </Link>
             <button
               onClick={handleLogout}
               className="flex items-center justify-center w-11 h-11 text-muted hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all border border-card-border/40 bg-background/40 shadow-sm"
               title="退出登录"
             >
-              <Settings className="w-4 h-4" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>

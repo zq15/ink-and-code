@@ -1,14 +1,18 @@
 import { prisma } from '@/lib/prisma';
-import { success } from '@/lib/api-response';
+import { success, requireAuth } from '@/lib/api-response';
 import { NextResponse } from 'next/server';
 
 /**
  * GET /api/category/list
- * 获取分类列表（扁平结构，前端构建树）
+ * 获取当前用户的分类列表（需要登录）
  */
 export async function GET() {
   try {
-    const categories = await (prisma as any).category.findMany({
+    const { userId, error: authError } = await requireAuth();
+    if (authError) return authError;
+
+    const categories = await prisma.category.findMany({
+      where: { userId: userId! },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: {
         _count: {
@@ -18,7 +22,7 @@ export async function GET() {
     });
 
     return success(
-      categories.map((cat: any) => ({
+      categories.map((cat) => ({
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
@@ -34,7 +38,7 @@ export async function GET() {
   } catch (error) {
     console.error('Failed to fetch categories:', error);
     return NextResponse.json(
-      { code: 500, message: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`, data: null },
+      { code: 500, message: `获取分类失败: ${error instanceof Error ? error.message : '未知错误'}`, data: null },
       { status: 500 }
     );
   }

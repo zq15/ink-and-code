@@ -21,22 +21,15 @@ export class ApiError extends Error {
 }
 
 /**
- * 获取 API Key（从 localStorage）
- */
-function getApiKey(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('admin_api_key');
-}
-
-/**
  * 基础 fetcher - 用于 SWR
- * 自动处理 JSON 解析和错误
+ * 使用 cookies 进行认证（NextAuth session）
  */
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
     },
+    credentials: 'include', // 包含 cookies
   });
 
   const json: ApiResponse<T> = await res.json();
@@ -49,25 +42,10 @@ export async function fetcher<T>(url: string): Promise<T> {
 }
 
 /**
- * 带认证的 fetcher - 用于需要 API Key 的请求
+ * 带认证的 fetcher（使用 session cookies）
  */
 export async function authFetcher<T>(url: string): Promise<T> {
-  const apiKey = getApiKey();
-  
-  const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(apiKey && { 'x-api-key': apiKey }),
-    },
-  });
-
-  const json: ApiResponse<T> = await res.json();
-
-  if (!res.ok || json.code >= 400) {
-    throw new ApiError(json.message || 'Request failed', json.code);
-  }
-
-  return json.data as T;
+  return fetcher<T>(url);
 }
 
 /**
@@ -78,17 +56,16 @@ export async function post<T, D extends object = Record<string, unknown>>(
   data: D,
   options?: FetcherOptions
 ): Promise<ApiResponse<T>> {
-  const apiKey = getApiKey();
   const { body: _, headers, ...restOptions } = options || {};
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(apiKey && { 'x-api-key': apiKey }),
       ...headers,
     },
     body: JSON.stringify(data),
+    credentials: 'include',
     ...restOptions,
   });
 
@@ -116,6 +93,7 @@ export async function get<T>(
       'Content-Type': 'application/json',
       ...headers,
     },
+    credentials: 'include',
     ...restOptions,
   });
 

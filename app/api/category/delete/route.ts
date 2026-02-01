@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import {
   success,
   ApiError,
-  validateApiKey,
+  requireAuth,
   validateRequired,
 } from '@/lib/api-response';
 import { NextResponse } from 'next/server';
@@ -10,17 +10,17 @@ import { NextResponse } from 'next/server';
 /**
  * 递归获取所有子分类 ID
  */
-async function getAllChildCategoryIds(parentId: string): Promise<string[]> {
-  const children = await (prisma as any).category.findMany({
-    where: { parentId },
+async function getAllChildCategoryIds(parentId: string, userId: string): Promise<string[]> {
+  const children = await prisma.category.findMany({
+    where: { parentId, userId },
     select: { id: true },
   });
 
-  const childIds: string[] = children.map((c: { id: string }) => c.id);
+  const childIds: string[] = children.map((c) => c.id);
   
   // 递归获取孙子分类
   for (const child of children) {
-    const grandChildIds = await getAllChildCategoryIds(child.id);
+    const grandChildIds = await getAllChildCategoryIds(child.id, userId);
     childIds.push(...grandChildIds);
   }
 
@@ -29,11 +29,11 @@ async function getAllChildCategoryIds(parentId: string): Promise<string[]> {
 
 /**
  * POST /api/category/delete
- * 删除分类（级联删除所有子分类和子文档）
+ * 删除分类（需要登录，只能删除自己的分类）
  */
 export async function POST(request: Request) {
   try {
-    const authError = validateApiKey(request);
+    const { userId, error: authError } = await requireAuth();
     if (authError) return authError;
 
     const data = await request.json();
@@ -41,27 +41,26 @@ export async function POST(request: Request) {
     const validationError = validateRequired(data, ['id']);
     if (validationError) return validationError;
 
-    const existing = await (prisma as any).category.findUnique({
-      where: { id: data.id },
+    const existing = await prisma.category.findFirst({
+      where: { id: data.id, userId: userId! },
     });
 
     if (!existing) {
-      return ApiError.notFound('Category not found');
+      return ApiError.notFound('分类不存在或无权限删除');
     }
 
     // 获取所有子分类 ID（包括嵌套的）
-    const childCategoryIds = await getAllChildCategoryIds(data.id);
+    const childCategoryIds = await getAllChildCategoryIds(data.id, userId!);
     const allCategoryIds = [data.id, ...childCategoryIds];
 
     // 使用事务确保原子性
-    await (prisma as any).$transaction(async (tx: any) => {
+    await prisma.$transaction(async (tx) => {
       // 1. 删除所有相关文章
       await tx.post.deleteMany({
-        where: { categoryId: { in: allCategoryIds } },
+        where: { categoryId: { in: allCategoryIds }, userId: userId! },
       });
 
       // 2. 删除所有子分类（从最深层开始，避免外键约束）
-      // 由于 onDelete: SetNull，我们需要先删除子分类再删除父分类
       for (const categoryId of childCategoryIds.reverse()) {
         await tx.category.delete({
           where: { id: categoryId },
@@ -74,11 +73,11 @@ export async function POST(request: Request) {
       });
     });
 
-    return success(null, 'Category and all contents deleted successfully');
+    return success(null, '分类及其内容已删除');
   } catch (error) {
     console.error('Failed to delete category:', error);
     return NextResponse.json(
-      { code: 500, message: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`, data: null },
+      { code: 500, message: `删除失败: ${error instanceof Error ? error.message : '未知错误'}`, data: null },
       { status: 500 }
     );
   }

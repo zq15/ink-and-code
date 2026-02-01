@@ -2,18 +2,18 @@ import { prisma } from '@/lib/prisma';
 import {
   success,
   ApiError,
-  validateApiKey,
+  requireAuth,
   validateRequired,
 } from '@/lib/api-response';
 
 /**
  * POST /api/article/update
- * 更新文章
+ * 更新文章（需要登录，只能更新自己的文章）
  */
 export async function POST(request: Request) {
   try {
-    // 验证 API Key
-    const authError = validateApiKey(request);
+    // 验证登录状态
+    const { userId, error: authError } = await requireAuth();
     if (authError) return authError;
 
     const data = await request.json();
@@ -22,22 +22,29 @@ export async function POST(request: Request) {
     const validationError = validateRequired(data, ['id']);
     if (validationError) return validationError;
 
-    // 检查文章是否存在
-    const existingArticle = await prisma.post.findUnique({
-      where: { id: data.id },
+    // 检查文章是否存在且属于当前用户
+    const existingArticle = await prisma.post.findFirst({
+      where: {
+        id: data.id,
+        userId: userId!,
+      },
     });
 
     if (!existingArticle) {
-      return ApiError.notFound('Article not found');
+      return ApiError.notFound('文章不存在或无权限修改');
     }
 
     // 如果要更新 slug，检查新 slug 是否已被使用
     if (data.slug && data.slug !== existingArticle.slug) {
-      const slugExists = await prisma.post.findUnique({
-        where: { slug: data.slug },
+      const slugExists = await prisma.post.findFirst({
+        where: {
+          userId: userId!,
+          slug: data.slug,
+          NOT: { id: data.id },
+        },
       });
       if (slugExists) {
-        return ApiError.conflict('An article with this slug already exists');
+        return ApiError.conflict('您已有一篇相同 slug 的文章');
       }
     }
 
@@ -58,7 +65,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return success(updatedArticle, 'Article updated successfully');
+    return success(updatedArticle, '文章更新成功');
   } catch (error) {
     console.error('Failed to update article:', error);
     return ApiError.internal();

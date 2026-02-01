@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { auth } from './auth';
 
 /**
  * 统一 API 响应格式
@@ -7,6 +8,30 @@ export interface ApiResponse<T = unknown> {
   code: number;
   data?: T;
   message?: string;
+}
+
+/**
+ * 获取当前登录用户 ID
+ * 返回 userId 或 null（未登录）
+ */
+export async function getCurrentUserId(): Promise<string | null> {
+  const session = await auth();
+  return session?.user?.id || null;
+}
+
+/**
+ * 验证用户登录状态
+ * 返回 { userId, error }
+ */
+export async function requireAuth(): Promise<{
+  userId: string | null;
+  error: NextResponse | null;
+}> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return { userId: null, error: ApiError.unauthorized('请先登录') };
+  }
+  return { userId, error: null };
 }
 
 /**

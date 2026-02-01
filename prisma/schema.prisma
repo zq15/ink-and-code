@@ -10,16 +10,71 @@ datasource db {
   url       = env("DATABASE_URL")
 }
 
-// 分类模型（支持树形结构）
+// NextAuth.js 用户模型（扩展）
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  
+  // 扩展字段
+  username      String?   @unique  // 用于公开链接 /u/username
+  bio           String?   @db.Text // 个人简介
+  headline      String?            // 一句话介绍
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  accounts      Account[]
+  sessions      Session[]
+  posts         Post[]
+  categories    Category[]
+  siteConfig    SiteConfig?
+
+  @@map("users")
+}
+
+// 用户站点配置
+model SiteConfig {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  
+  // 站点基本信息
+  siteName    String?  @map("site_name")     // 站点名称
+  siteTagline String?  @map("site_tagline")  // 站点标语
+  
+  // 主题配置
+  primaryColor String? @map("primary_color") // 主题色
+  
+  // 社交链接
+  githubUrl   String?  @map("github_url")
+  twitterUrl  String?  @map("twitter_url")
+  linkedinUrl String?  @map("linkedin_url")
+  websiteUrl  String?  @map("website_url")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("site_configs")
+}
+
+// 分类模型（支持树形结构，关联用户）
 model Category {
   id        String   @id @default(uuid())
   name      String
-  slug      String   @unique
+  slug      String
   icon      String?  // 可选的图标（emoji 或图标名）
   color     String?  // 可选的颜色
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // 用户关联
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // 树形结构
   parentId  String?   @map("parent_id")
@@ -28,14 +83,16 @@ model Category {
   
   posts     Post[]
 
+  @@unique([userId, slug])  // 同一用户下 slug 唯一
+  @@index([userId])
   @@index([parentId])
   @@map("categories")
 }
 
-// 文章模型
+// 文章模型（关联用户）
 model Post {
   id         String    @id @default(uuid())
-  slug       String    @unique
+  slug       String
   title      String
   content    String    @db.Text
   excerpt    String?
@@ -45,12 +102,54 @@ model Post {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
   
+  // 用户关联
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   // 分类关联
   categoryId String?   @map("category_id")
   category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, slug])  // 同一用户下 slug 唯一
+  @@index([userId])
   @@index([categoryId])
   @@index([published])
   @@index([title])
   @@map("posts")
+}
+
+// OAuth 账户关联
+model Account {
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// 用户会话
+model Session {
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }

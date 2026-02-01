@@ -2,18 +2,18 @@ import { prisma } from '@/lib/prisma';
 import {
   created,
   ApiError,
-  validateApiKey,
+  requireAuth,
   validateRequired,
 } from '@/lib/api-response';
 import { NextResponse } from 'next/server';
 
 /**
  * POST /api/category/create
- * 创建分类
+ * 创建分类（需要登录）
  */
 export async function POST(request: Request) {
   try {
-    const authError = validateApiKey(request);
+    const { userId, error: authError } = await requireAuth();
     if (authError) return authError;
 
     const data = await request.json();
@@ -24,22 +24,22 @@ export async function POST(request: Request) {
     // 生成 slug（如果未提供）
     const slug = data.slug || `cat-${Date.now()}`;
 
-    // 检查 slug 是否已存在
-    const existing = await (prisma as any).category.findUnique({
-      where: { slug },
+    // 检查当前用户下 slug 是否已存在
+    const existing = await prisma.category.findFirst({
+      where: { userId: userId!, slug },
     });
 
     if (existing) {
-      return ApiError.conflict('Category with this slug already exists');
+      return ApiError.conflict('您已有一个相同 slug 的分类');
     }
 
     // 获取最大排序值
-    const maxSort = await (prisma as any).category.aggregate({
-      where: { parentId: data.parentId || null },
+    const maxSort = await prisma.category.aggregate({
+      where: { userId: userId!, parentId: data.parentId || null },
       _max: { sortOrder: true },
     });
 
-    const category = await (prisma as any).category.create({
+    const category = await prisma.category.create({
       data: {
         name: data.name,
         slug,
@@ -47,17 +47,18 @@ export async function POST(request: Request) {
         color: data.color || null,
         sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
         parentId: data.parentId || null,
+        userId: userId!,
       },
     });
 
     return created({
       ...category,
       postCount: 0,
-    }, 'Category created successfully');
+    }, '分类创建成功');
   } catch (error) {
     console.error('Failed to create category:', error);
     return NextResponse.json(
-      { code: 500, message: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`, data: null },
+      { code: 500, message: `创建失败: ${error instanceof Error ? error.message : '未知错误'}`, data: null },
       { status: 500 }
     );
   }
