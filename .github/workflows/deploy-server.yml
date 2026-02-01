@@ -37,20 +37,34 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: 修改端口配置
-        run: sed -i 's/start -p [0-9]*/start -p 3000/' ecosystem.config.js
+        run: sed -i 's/start -H 0.0.0.0 -p [0-9]*/start -H 0.0.0.0 -p 3000/' ecosystem.config.js
 
-      - name: 部署到服务器
-        uses: easingthemes/ssh-deploy@main
+      - name: 打包部署文件
+        run: |
+          mkdir -p deploy
+          cp -r .next deploy/.next
+          cp -r public deploy/public
+          cp -r prisma deploy/prisma
+          cp -r content deploy/content
+          cp package.json deploy/
+          cp pnpm-lock.yaml deploy/
+          cp ecosystem.config.js deploy/
+          # 删除不需要的缓存
+          rm -rf deploy/.next/cache
+          # 打包
+          tar -czf deploy.tar.gz -C deploy .
+
+      - name: 上传部署包到服务器
+        uses: appleboy/scp-action@v0.1.7
         with:
-          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
-          REMOTE_USER: ${{ secrets.SERVER_USER }}
-          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
-          SOURCE: ".next/ public/ package.json pnpm-lock.yaml ecosystem.config.js prisma/"
-          TARGET: ${{ secrets.PROJECT_PATH }}
-          EXCLUDE: ".next/cache/"
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "deploy.tar.gz"
+          target: "/tmp"
 
-      - name: 安装依赖并重启服务
+      - name: 解压并重启服务
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -58,6 +72,29 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
+            # 备份旧的 .env 文件（如果存在）
+            if [ -f "${{ secrets.PROJECT_PATH }}/.env" ]; then
+              cp ${{ secrets.PROJECT_PATH }}/.env /tmp/.env.backup
+            fi
+            
+            # 清空目标目录
+            rm -rf ${{ secrets.PROJECT_PATH }}/*
+            rm -rf ${{ secrets.PROJECT_PATH }}/.[!.]*
+            
+            # 解压新文件
+            tar -xzf /tmp/deploy.tar.gz -C ${{ secrets.PROJECT_PATH }}
+            
+            # 恢复 .env 文件
+            if [ -f "/tmp/.env.backup" ]; then
+              mv /tmp/.env.backup ${{ secrets.PROJECT_PATH }}/.env
+            else
+              # 创建 .env 文件
+              echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > ${{ secrets.PROJECT_PATH }}/.env
+            fi
+            
+            # 清理临时文件
+            rm -f /tmp/deploy.tar.gz
+            
             cd ${{ secrets.PROJECT_PATH }}
             
             # 安装生产依赖
