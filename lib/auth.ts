@@ -40,6 +40,7 @@ async function generateUniqueUsername(name: string | null): Promise<string> {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  trustHost: true, // 信任所有主机（生产环境建议配置 AUTH_URL）
   providers: [
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID!,
