@@ -1,4 +1,4 @@
-# 部署到自有服务器（通过 SSH）
+# 部署到自有服务器（GitHub 构建 + SSH 部署）
 name: Deploy to Server
 
 on:
@@ -7,48 +7,66 @@ on:
   workflow_dispatch: # 允许手动触发
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 通过 SSH 部署到服务器
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: 安装依赖
+        run: pnpm install
+
+      - name: 生成 Prisma Client
+        run: pnpm prisma generate
+
+      - name: 构建项目
+        run: pnpm next build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: 修改端口配置
+        run: sed -i 's/start -p [0-9]*/start -p 3000/' ecosystem.config.js
+
+      - name: 部署到服务器
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
+          SOURCE: ".next/ public/ package.json pnpm-lock.yaml ecosystem.config.js prisma/ node_modules/"
+          TARGET: ${{ secrets.PROJECT_PATH }}
+          EXCLUDE: "node_modules/.cache/, .next/cache/"
+
+      - name: 重启服务
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          timeout: 60s
-          debug: true
           script: |
-            # 进入项目目录
             cd ${{ secrets.PROJECT_PATH }}
             
-            # 拉取最新代码
-            git pull origin main
+            # 同步数据库
+            pnpm prisma db push --skip-generate
             
-            # 安装依赖
-            pnpm install
-            
-            # 生成 Prisma Client
-            pnpm prisma generate
-            
-            # 构建项目（包含数据库同步）
-            pnpm build
-            
-            # 修改端口为 3000
-            sed -i 's/start -p [0-9]*/start -p 3000/' ecosystem.config.js
-            
-            # 使用 PM2 ecosystem 配置文件实现零停机部署
-            # 如果进程存在则 reload，否则启动
+            # 重启 PM2
             if pm2 describe ink-and-code > /dev/null 2>&1; then
-              # 进程已存在，使用 reload 实现优雅重启
               pm2 reload ecosystem.config.js --update-env
             else
-              # 进程不存在，首次启动
               pm2 start ecosystem.config.js
             fi
             pm2 save
