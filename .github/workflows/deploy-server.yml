@@ -39,6 +39,9 @@ jobs:
             # 构建项目（包含数据库同步）
             pnpm build
             
+            # 修改端口为 3000
+            sed -i 's/start -p [0-9]*/start -p 3000/' ecosystem.config.js
+            
             # 使用 PM2 ecosystem 配置文件实现零停机部署
             # 如果进程存在则 reload，否则启动
             if pm2 describe ink-and-code > /dev/null 2>&1; then
