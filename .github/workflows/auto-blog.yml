@@ -38,30 +38,47 @@ jobs:
           DIFF=$(cat /tmp/commit_diff.txt | head -c 8000)
           FILES=$(cat /tmp/files_changed.txt)
           
-          # Build prompt
-          PROMPT="You are a technical blog writer. Write a blog post in Chinese based on this Git commit.
+          # Build prompt (no indentation to avoid AI copying it)
+          read -r -d '' PROMPT << 'PROMPT_END'
+You are a technical blog writer. Write a blog post in Chinese based on this Git commit.
 
-          Repository: ${REPO_NAME}
-          Commit: ${COMMIT_MSG}
-          Files changed:
-          ${FILES}
+Repository: REPO_PLACEHOLDER
+Commit: MSG_PLACEHOLDER
+Files changed:
+FILES_PLACEHOLDER
 
-          Diff (truncated):
-          ${DIFF}
+Diff (truncated):
+DIFF_PLACEHOLDER
 
-          Requirements:
-          1. Write an attractive Chinese title
-          2. Use Markdown format
-          3. Include: background, implementation details, code explanation, summary
-          4. 800-1500 words in Chinese
-          5. Output EXACTLY in this format:
+Requirements:
+1. Write an attractive Chinese title (no quotes)
+2. Use Markdown format, start content directly (no leading spaces or >)
+3. Include: background, implementation details, code explanation, summary
+4. 800-1500 words in Chinese
+5. Output EXACTLY in this format (no extra spaces before markers):
 
-          ---TITLE---
-          Your Title Here
-          ---CONTENT---
-          Your markdown content here
-          ---TAGS---
-          tag1,tag2,tag3"
+---TITLE---
+文章标题
+---CONTENT---
+## 背景
+
+正文内容...
+
+## 实现
+
+代码说明...
+
+## 总结
+
+总结内容...
+---TAGS---
+标签1,标签2,标签3
+PROMPT_END
+          # Replace placeholders
+          PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
+          PROMPT="${PROMPT//MSG_PLACEHOLDER/$COMMIT_MSG}"
+          PROMPT="${PROMPT//FILES_PLACEHOLDER/$FILES}"
+          PROMPT="${PROMPT//DIFF_PLACEHOLDER/$DIFF}"
 
           ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs .)
           
