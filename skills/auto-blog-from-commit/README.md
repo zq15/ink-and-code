@@ -3,6 +3,7 @@
 自动将 Git Commit 转换为技术博客文章，并发布到 ink-and-code 博客平台。
 
 [![Auto Blog](https://img.shields.io/badge/Auto%20Blog-Enabled-brightgreen)](https://github.com)
+[![DeepSeek](https://img.shields.io/badge/AI-DeepSeek%20%7C%20Claude%20%7C%20OpenAI-blue)](https://platform.deepseek.com)
 
 ## 工作原理
 
