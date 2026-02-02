@@ -103,9 +103,9 @@ jobs:
           echo "$GENERATED" > /tmp/ai_output.txt
           
           # Parse output to separate files (avoid shell expansion issues)
-          awk '/---TITLE---/{flag=1; next} /---CONTENT---/{flag=0} flag' /tmp/ai_output.txt | tr -d '\n' | xargs > /tmp/title.txt
+          awk '/---TITLE---/{flag=1; next} /---CONTENT---/{flag=0} flag' /tmp/ai_output.txt | tr -d '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > /tmp/title.txt
           awk '/---CONTENT---/{flag=1; next} /---TAGS---/{flag=0} flag' /tmp/ai_output.txt > /tmp/content.txt
-          awk '/---TAGS---/{flag=1; next} flag' /tmp/ai_output.txt | tr -d '\n' | xargs > /tmp/tags.txt
+          awk '/---TAGS---/{flag=1; next} flag' /tmp/ai_output.txt | tr -d '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' > /tmp/tags.txt
           
           TITLE=$(cat /tmp/title.txt)
           TAGS=$(cat /tmp/tags.txt)
