@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import OSS from 'ali-oss';
 import { prisma } from '@/lib/prisma';
@@ -285,8 +286,8 @@ export async function GET() {
       accessKeySecret: siteConfig.ossAccessKeySecret,
     });
 
-    // 列出一个文件来测试连接
-    await client.list({ 'max-keys': 1 });
+    // 获取 Bucket 信息来测试连接
+    await client.list({ 'max-keys': 1 }, {});
 
     return NextResponse.json({
       code: 200,

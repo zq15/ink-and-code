@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Inter, EB_Garamond } from "next/font/google";
 import "./globals.css";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -8,18 +7,6 @@ import { SWRProvider } from "./components/SWRProvider";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 import AuthProvider from "./components/AuthProvider";
 import ChatAssistant from "./components/ChatAssistant";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-const ebGaramond = EB_Garamond({
-  subsets: ["latin"],
-  variable: "--font-serif",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Ink & Code | 用代码书写思想",
@@ -48,7 +35,7 @@ export default function RootLayout({
   `;
 
   return (
-    <html lang="zh-CN" className={`${inter.variable} ${ebGaramond.variable}`} suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

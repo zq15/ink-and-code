@@ -31,8 +31,8 @@
   --glass-bg: rgba(3, 3, 3, 0.8);
   --glass-border: rgba(255, 255, 255, 0.03);
   --noise-opacity: 0.02;
-  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
-  --font-serif: var(--font-serif), Georgia, serif;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
 }
 
 /* 亮色主题 */
