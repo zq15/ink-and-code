@@ -32,8 +32,28 @@ model User {
   categories    Category[]
   siteConfig    SiteConfig?
   apiTokens     ApiToken[]
+  
+  // 关注关系
+  followers     Follow[]  @relation("Following")  // 我的粉丝
+  following     Follow[]  @relation("Followers")  // 我关注的人
 
   @@map("users")
+}
+
+// 关注关系模型
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String   @map("follower_id")   // 关注者
+  followingId String   @map("following_id")  // 被关注者
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  follower    User     @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
 }
 
 // 用户站点配置

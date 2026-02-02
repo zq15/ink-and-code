@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { Github, Globe, Linkedin, Twitter, Calendar, ArrowRight } from 'lucide-react';
+import FollowButton from '@/app/components/FollowButton';
+import FollowStats from '@/app/components/FollowStats';
 
 interface Props {
   params: Promise<{ username: string }>;
@@ -45,6 +47,12 @@ export default async function UserPublicPage({ params }: Props) {
           coverImage: true,
         },
       },
+      _count: {
+        select: {
+          followers: true,  // 粉丝数
+          following: true,  // 关注数
+        },
+      },
     },
   });
 
@@ -53,6 +61,8 @@ export default async function UserPublicPage({ params }: Props) {
   }
 
   const siteConfig = user.siteConfig;
+  const followersCount = user._count.followers;
+  const followingCount = user._count.following;
 
   return (
     <div className="min-h-screen">
@@ -87,6 +97,16 @@ export default async function UserPublicPage({ params }: Props) {
               <p className="text-muted leading-relaxed mb-6 max-w-2xl">
                 {user.bio || '这个人很懒，还没有写简介...'}
               </p>
+
+              {/* 关注统计和按钮 */}
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mb-6">
+                <FollowStats
+                  userId={user.id}
+                  initialFollowing={followingCount}
+                  initialFollowers={followersCount}
+                />
+                <FollowButton userId={user.id} />
+              </div>
 
               {/* 社交链接 */}
               <div className="flex items-center justify-center sm:justify-start gap-3">
