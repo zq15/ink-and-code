@@ -1,3 +1,12 @@
+/*
+ * :file description: 
+ * :name: /ink-and-code/app/components/DocTree.tsx
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ * :date created: 2026-01-30 15:28:33
+ * :last editor: PTC
+ * :date last edited: 2026-02-02 13:51:34
+ */
 'use client';
 
 import { useState, useRef, useEffect, createContext, useContext, useMemo } from 'react';
@@ -60,11 +69,10 @@ function ArticleNode({ article, depth }: ArticleNodeProps) {
 
   return (
     <div
-      className={`group flex items-center gap-2.5 py-1.5 pr-2.5 mx-1 rounded-lg cursor-pointer transition-all duration-200 ${
-        isSelected 
-          ? 'bg-primary/10 text-primary font-medium shadow-[inset_0_0_0_1px_rgba(var(--primary),0.1)]' 
+      className={`group flex items-center gap-2.5 py-1.5 pr-2.5 mx-1 rounded-lg cursor-pointer transition-all duration-200 ${isSelected
+          ? 'bg-primary/10 text-primary font-medium shadow-[inset_0_0_0_1px_rgba(var(--primary),0.1)]'
           : 'hover:bg-card-border/40 text-muted/80 hover:text-foreground'
-      }`}
+        }`}
       style={{ paddingLeft }}
       onClick={() => ctx.onSelect(article.id, 'article')}
     >
@@ -80,7 +88,7 @@ function ArticleNode({ article, depth }: ArticleNodeProps) {
           e.stopPropagation();
           ctx.onDeleteArticle(article.id);
         }}
-        className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-all"
+        className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-all cursor-pointer"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -118,11 +126,10 @@ function CategoryNode({ node }: CategoryNodeProps) {
   return (
     <div className="space-y-0.5">
       <div
-        className={`group flex items-center gap-2 py-2 pr-2.5 mx-1 rounded-xl cursor-pointer transition-all duration-200 ${
-          isSelected 
-            ? 'bg-primary/5 text-primary font-semibold' 
+        className={`group flex items-center gap-2 py-2 pr-2.5 mx-1 rounded-xl cursor-pointer transition-all duration-200 ${isSelected
+            ? 'bg-primary/5 text-primary font-semibold'
             : 'hover:bg-card-border/30 text-muted/90 hover:text-foreground'
-        }`}
+          }`}
         style={{ paddingLeft }}
         onClick={() => {
           ctx.onToggleExpand(node.id);
@@ -180,14 +187,14 @@ function CategoryNode({ node }: CategoryNodeProps) {
               {articles.length}
             </span>
           )}
-          
+
           <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all gap-0.5">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 ctx.onAddArticle(node.id);
               }}
-              className="p-1 hover:bg-primary/10 hover:text-primary rounded-md transition-colors"
+              className="p-1 hover:bg-primary/10 hover:text-primary rounded-md transition-colors cursor-pointer"
               title="新建文章"
             >
               <FilePlus className="w-3.5 h-3.5" />
@@ -197,7 +204,7 @@ function CategoryNode({ node }: CategoryNodeProps) {
                 e.stopPropagation();
                 ctx.onAddCategory(node.id);
               }}
-              className="p-1 hover:bg-primary/10 hover:text-primary rounded-md transition-colors"
+              className="p-1 hover:bg-primary/10 hover:text-primary rounded-md transition-colors cursor-pointer"
               title="新建子分类"
             >
               <FolderPlus className="w-3.5 h-3.5" />
@@ -207,7 +214,7 @@ function CategoryNode({ node }: CategoryNodeProps) {
                 e.stopPropagation();
                 ctx.onDeleteCategory(node.id);
               }}
-              className="p-1 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-colors"
+              className="p-1 hover:bg-red-500/10 hover:text-red-400 rounded-md transition-colors cursor-pointer"
               title="删除文件夹"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -435,14 +442,14 @@ export default function DocTree({
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleCreateArticle(null)}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-primary/5 border border-primary/10 hover:bg-primary/10 text-primary rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-primary/5 border border-primary/10 hover:bg-primary/10 text-primary rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer"
             >
               <FilePlus className="w-3.5 h-3.5" />
               <span>新建文章</span>
             </button>
             <button
               onClick={() => handleAddCategory(null)}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-card-border/20 border border-card-border/40 hover:bg-card-border/40 text-muted-foreground rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all"
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-card-border/20 border border-card-border/40 hover:bg-card-border/40 text-muted-foreground rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer"
             >
               <FolderPlus className="w-3.5 h-3.5" />
               <span>新建文件夹</span>

@@ -5,7 +5,7 @@
  */
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
-import { ArrowRight, Sparkles, Globe, Palette, Code2, Github, Zap, Shield, Users } from 'lucide-react';
+import { ArrowRight, Sparkles, Globe, Palette, Code2, Github, Zap, Shield, ImageIcon } from 'lucide-react';
 
 export default async function LandingPage() {
   const session = await auth();
@@ -149,9 +149,9 @@ export default async function LandingPage() {
                 bg: 'bg-red-500/10',
               },
               {
-                icon: Users,
-                title: '社交登录',
-                desc: '支持 GitHub、Google 一键登录，无需注册',
+                icon: ImageIcon,
+                title: '图床支持',
+                desc: '内置图床或自配阿里云 OSS，拖拽上传图片',
                 color: 'text-cyan-500',
                 bg: 'bg-cyan-500/10',
               },

@@ -32,16 +32,16 @@ export default function UserMenu({ user }: UserMenuProps) {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-1 rounded-full hover:bg-card-border/40 transition-colors"
+        className="flex items-center gap-2 p-1 rounded-full hover:bg-card-border/40 transition-colors cursor-pointer"
       >
         {user.image ? (
           <img
             src={user.image}
             alt={user.name || 'User'}
-            className="w-8 h-8 rounded-full ring-2 ring-card-border"
+            className="w-8 h-8 rounded-full ring-2 ring-card-border hover:ring-primary/50 transition-all cursor-pointer"
           />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-card-border">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-card-border hover:ring-primary/50 transition-all cursor-pointer">
             <User className="w-4 h-4 text-primary" />
           </div>
         )}
@@ -60,14 +60,14 @@ export default function UserMenu({ user }: UserMenuProps) {
             <Link
               href="/admin"
               onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted hover:text-foreground hover:bg-card-border/40 transition-colors"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted hover:text-foreground hover:bg-card-border/40 transition-colors cursor-pointer"
             >
               <Settings className="w-4 h-4" />
               <span>管理后台</span>
             </Link>
             <button
               onClick={() => signOut({ callbackUrl: '/' })}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               <span>退出登录</span>

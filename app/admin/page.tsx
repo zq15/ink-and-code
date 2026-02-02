@@ -5,7 +5,7 @@
  * :copyright: (c) 2026, Tungee
  * :date created: 2026-01-29 19:16:00
  * :last editor: PTC
- * :date last edited: 2026-01-30 21:01:44
+ * :date last edited: 2026-02-02 13:55:48
  */
 'use client';
 
@@ -22,7 +22,7 @@ import {
   useCategoryList,
 } from '@/lib/hooks';
 import { ApiError } from '@/lib/fetcher';
-import { Trash2, Home, Tag, Layout, FilePlus, PanelLeftClose, PanelLeft, LogOut, User, Link2 } from 'lucide-react';
+import { Trash2, Home, Tag, Layout, FilePlus, PanelLeftClose, PanelLeft, LogOut, User, Settings } from 'lucide-react';
 import DocTree from '@/app/components/DocTree';
 import { useConfirm } from '@/app/components/ConfirmDialog';
 
@@ -115,6 +115,26 @@ export default function AdminPage() {
     }
   }, [articleData, selectedId]);
 
+  // Cmd+S / Ctrl+S 保存快捷键
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        // 使用 ref 获取最新状态
+        if (selectedIdRef.current && formRef.current.title.trim()) {
+          // 触发保存
+          const saveBtn = document.querySelector('[data-save-btn]') as HTMLButtonElement;
+          if (saveBtn && !saveBtn.disabled) {
+            saveBtn.click();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // 显示消息
   const showMessage = useCallback((type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
@@ -145,7 +165,7 @@ export default function AdminPage() {
   const autoSave = useCallback(async () => {
     const currentForm = formRef.current;
     const currentId = selectedIdRef.current;
-    
+
     if (!currentId || !currentForm.title.trim()) return;
 
     const postData = {
@@ -327,14 +347,14 @@ export default function AdminPage() {
         <div className="w-full max-w-sm animate-in fade-in zoom-in-95 duration-500">
           <div className="bg-card/40 backdrop-blur-xl border border-card-border/60 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl -mr-10 -mt-10 rounded-full" />
-            
+
             <div className="relative z-10">
               <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 border border-primary/20 shadow-sm">
                 <User className="w-7 h-7 text-primary" />
               </div>
               <h1 className="text-2xl font-bold tracking-tight mb-2">需要登录</h1>
               <p className="text-muted/60 text-sm mb-8 serif italic">请登录后访问管理后台</p>
-              
+
               <Link
                 href="/login"
                 className="block w-full py-4 bg-primary text-primary-foreground rounded-2xl text-[11px] font-extrabold uppercase tracking-[0.2em] hover:shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98] shadow-md text-center"
@@ -384,10 +404,10 @@ export default function AdminPage() {
                 <img
                   src={session.user.image}
                   alt={session.user.name || 'User'}
-                  className="w-9 h-9 rounded-xl ring-2 ring-card-border"
+                  className="w-9 h-9 rounded-xl ring-2 ring-card-border cursor-pointer hover:ring-primary/50 transition-all"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center ring-2 ring-card-border">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center ring-2 ring-card-border cursor-pointer hover:ring-primary/50 transition-all">
                   <User className="w-4 h-4 text-primary" />
                 </div>
               )}
@@ -402,10 +422,10 @@ export default function AdminPage() {
               href="/admin/settings"
               className="flex items-center justify-center gap-2 px-3 py-3 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl transition-all shadow-sm"
             >
-              <Link2 className="w-4 h-4" />
-              <span>生成我的主页</span>
+              <Settings className="w-4 h-4" />
+              <span>设置</span>
             </Link>
-            <p className="text-[10px] text-muted text-center mt-1.5">创建专属链接，分享给朋友</p>
+            <p className="text-[10px] text-muted text-center mt-1.5">创建专属链接，配置图床</p>
           </div>
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -469,11 +489,10 @@ export default function AdminPage() {
 
                 {/* 发布状态 */}
                 <div
-                  className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.15em] transition-all shadow-sm border ${
-                    form.published
+                  className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.15em] transition-all shadow-sm border ${form.published
                       ? 'bg-green-500/5 text-green-500 border-green-500/20 shadow-green-500/5'
                       : 'bg-yellow-500/5 text-yellow-500 border-yellow-500/20 shadow-yellow-500/5'
-                  }`}
+                    }`}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${form.published ? 'bg-green-500' : 'bg-yellow-500'}`} />
                   <span>{form.published ? '已发布' : '草稿模式'}</span>
@@ -496,11 +515,10 @@ export default function AdminPage() {
                 {/* 状态反馈 */}
                 {message && (
                   <span
-                    className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl border animate-in fade-in slide-in-from-right-4 duration-500 ${
-                      message.type === 'success' 
-                        ? 'bg-green-500/5 text-green-500 border-green-500/20' 
+                    className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-xl border animate-in fade-in slide-in-from-right-4 duration-500 ${message.type === 'success'
+                        ? 'bg-green-500/5 text-green-500 border-green-500/20'
                         : 'bg-red-500/5 text-red-400 border-red-500/20'
-                    }`}
+                      }`}
                   >
                     {message.text}
                   </span>
@@ -509,13 +527,13 @@ export default function AdminPage() {
                 {/* 保存/发布操作组 */}
                 <div className="flex items-center bg-background/40 border border-card-border/80 rounded-2xl p-1 gap-1 shadow-sm">
                   <button
+                    data-save-btn
                     onClick={handleSave}
-                    disabled={isSaving}
-                    className={`px-5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${
-                      hasChanges
+                    disabled={isSaving || !hasChanges}
+                    className={`px-5 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-al cursor-pointer ${hasChanges
                         ? 'bg-primary/10 text-primary hover:bg-primary/20 shadow-sm'
                         : 'text-muted/30 cursor-default opacity-50'
-                    }`}
+                      }`}
                   >
                     {isSaving ? '正在同步' : hasChanges ? '保存修改' : '已同步'}
                   </button>
@@ -548,11 +566,10 @@ export default function AdminPage() {
                       }
                     }}
                     disabled={isSaving || !form.title.trim()}
-                    className={`px-6 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.2em] transition-all shadow-md active:scale-95 ${
-                      form.published
+                    className={`px-6 py-2 rounded-xl text-[11px] font-extrabold uppercase tracking-[0.2em] transition-all shadow-md active:scale-95 cursor-pointer ${form.published
                         ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
                         : 'bg-primary text-primary-foreground hover:shadow-lg hover:shadow-primary/30'
-                    }`}
+                      }`}
                   >
                     {form.published ? '撤回发布' : '发布文档'}
                   </button>
@@ -633,7 +650,7 @@ export default function AdminPage() {
               </h3>
               <div className="space-y-2">
                 <p className="text-[11px] text-muted/40 font-bold uppercase tracking-[0.4em] leading-relaxed">
-                  选择现有文档进行编辑<br/>或者点击左侧按钮开启新灵感
+                  选择现有文档进行编辑<br />或者点击左侧按钮开启新灵感
                 </p>
               </div>
             </div>

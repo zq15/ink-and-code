@@ -238,7 +238,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
                         <button
                           key={article.id}
                           onClick={() => handleSearchResultClick(article.id)}
-                          className="w-full flex items-start gap-3 px-4 py-3 hover:bg-primary/5 transition-colors text-left border-b border-card-border/30 last:border-b-0"
+                          className="w-full flex items-start gap-3 px-4 py-3 hover:bg-primary/5 transition-colors text-left border-b border-card-border/30 last:border-b-0 cursor-pointer"
                         >
                           <FileText className="w-4 h-4 text-primary/60 mt-0.5 shrink-0" />
                           <div className="flex-1 min-w-0">
@@ -404,7 +404,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
                       <button
                         key={post.id}
                         onClick={() => handleSelectArticle(post.id)}
-                        className="w-full text-left p-4 bg-card/50 border border-card-border/50 rounded-xl hover:border-primary/30 transition-all"
+                        className="w-full text-left p-4 bg-card/50 border border-card-border/50 rounded-xl hover:border-primary/30 transition-all cursor-pointer"
                       >
                         <div className="flex items-start gap-3">
                           <FileText className="w-5 h-5 text-primary/60 mt-0.5 shrink-0" />

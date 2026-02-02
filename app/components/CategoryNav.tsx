@@ -24,7 +24,7 @@ function ArticleNode({ article, depth, isSelected, onSelect }: ArticleNodeProps)
   return (
     <button
       onClick={() => onSelect(article.id)}
-      className={`w-full flex items-center gap-3 py-2 pr-4 rounded-xl text-sm transition-all duration-300 group ${
+      className={`w-full flex items-center gap-3 py-2 pr-4 rounded-xl text-sm transition-all duration-300 group cursor-pointer ${
         isSelected
           ? 'bg-primary/10 text-primary font-medium shadow-[inset_0_0_0_1px_rgba(var(--primary),0.1)]'
           : 'text-muted/70 hover:text-foreground hover:bg-card-border/30'
@@ -74,7 +74,7 @@ function CategoryNavItem({
           onToggleExpand(node.id);
           onSelectCategory(node.id);
         }}
-        className={`w-full flex items-center gap-2.5 py-2.5 pr-4 rounded-xl text-sm transition-all duration-300 group ${
+        className={`w-full flex items-center gap-2.5 py-2.5 pr-4 rounded-xl text-sm transition-all duration-300 group cursor-pointer ${
           isCategorySelected
             ? 'bg-primary/5 text-primary font-semibold'
             : 'text-muted/80 hover:text-foreground hover:bg-card-border/40'
@@ -254,7 +254,7 @@ export default function CategoryNav({
             onSelectCategory(null);
             if (onSelectArticle) onSelectArticle('');
           }}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-all duration-300 group mb-2 ${
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm transition-all duration-300 group mb-2 cursor-pointer ${
             !selectedCategoryId && !selectedArticleId
               ? 'bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/20'
               : 'text-muted/80 hover:text-foreground hover:bg-card-border/40'

@@ -1,3 +1,12 @@
+/*
+ * :file description: 
+ * :name: /ink-and-code/app/admin/settings/page.tsx
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ * :date created: 2026-02-01 21:17:35
+ * :last editor: PTC
+ * :date last edited: 2026-02-02 13:59:00
+ */
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -328,7 +337,7 @@ export default function SettingsPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-foreground">设置你的主页</h1>
+            <h1 className="text-xl font-bold text-foreground">设置</h1>
             <p className="text-sm text-muted">填写信息后保存，即可生成专属链接</p>
           </div>
         </div>
