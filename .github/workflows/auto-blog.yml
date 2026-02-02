@@ -53,39 +53,37 @@ jobs:
           REPO="${{ github.repository }}"
           FILES_CHANGED="${{ steps.diff.outputs.files_changed }}"
           
-          # 创建 AI 请求的 prompt
-          PROMPT="你是一位技术博客作家。请根据以下 Git commit 信息，撰写一篇技术博客文章。
+          # 创建 AI 请求的 prompt (使用 heredoc)
+          PROMPT=$(cat <<'PROMPT_EOF'
+          You are a technical blog writer. Based on the following Git commit information, write a technical blog post in Chinese.
 
-## Commit 信息
-- 仓库: ${REPO}
-- Commit Message: ${COMMIT_MSG}
-- 变更的文件:
-${FILES_CHANGED}
+          Commit Info:
+          PROMPT_EOF
+          )
+          PROMPT="$PROMPT
+          - Repository: ${REPO}
+          - Commit Message: ${COMMIT_MSG}
+          - Changed Files:
+          ${FILES_CHANGED}
 
-## Commit Diff
-\`\`\`
-${DIFF:0:10000}
-\`\`\`
+          Commit Diff:
+          ${DIFF:0:10000}
 
-## 要求
-1. 文章标题要吸引人，体现技术亮点
-2. 用 Markdown 格式撰写
-3. 包含以下内容：
-   - 背景/问题描述
-   - 解决方案/实现细节
-   - 关键代码说明
-   - 总结和收获
-4. 代码块使用正确的语言标记
-5. 字数控制在 800-1500 字
-6. 使用中文撰写
+          Requirements:
+          1. Create an attractive title highlighting technical aspects
+          2. Write in Markdown format
+          3. Include: background, solution details, key code explanation, summary
+          4. Use proper language tags for code blocks
+          5. Keep it 800-1500 words
+          6. Write in Chinese
 
-请直接输出文章内容，格式为：
----TITLE---
-<文章标题>
----CONTENT---
-<文章正文 Markdown>
----TAGS---
-<标签1>,<标签2>,<标签3>"
+          Output format:
+          ---TITLE---
+          <article title>
+          ---CONTENT---
+          <article content in Markdown>
+          ---TAGS---
+          <tag1>,<tag2>,<tag3>"
 
           # 使用 DeepSeek（优先）、Claude 或 OpenAI API
           # 转义 JSON 特殊字符
