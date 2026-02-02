@@ -1,4 +1,4 @@
-# Auto generate blog posts from commits
+# Auto generate blog posts from commits with TipTap format
 name: Auto Blog from Commit
 
 on:
