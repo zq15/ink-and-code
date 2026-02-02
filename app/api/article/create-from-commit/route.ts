@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { created, ApiError, requireTokenAuth, validateRequired } from '@/lib/api-response';
 import { NextResponse } from 'next/server';
+import { markdownToTiptap } from '@/lib/markdown-to-tiptap';
 
 /**
  * POST /api/article/create-from-commit
@@ -78,8 +79,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // 构建文章内容
-    let content = data.content;
+    // 构建文章内容（Markdown 格式）
+    let markdownContent = data.content;
 
     // 如果提供了 commitInfo，在文章末尾添加来源信息
     if (data.commitInfo) {
@@ -88,12 +89,15 @@ export async function POST(request: Request) {
 
 ---
 
-> 📝 本文由 [${repo}](https://github.com/${repo}) 的 commit [${sha.slice(0, 7)}](${url}) 自动生成
+> 本文由 [${repo}](https://github.com/${repo}) 的 commit [${sha.slice(0, 7)}](${url}) 自动生成
 > 
 > **Commit Message:** ${message}
 `;
-      content = content + commitFooter;
+      markdownContent = markdownContent + commitFooter;
     }
+
+    // 将 Markdown 转换为 TipTap JSON 格式
+    const content = markdownToTiptap(markdownContent);
 
     // 创建文章
     const article = await prisma.post.create({
@@ -101,7 +105,7 @@ export async function POST(request: Request) {
         title,
         slug,
         content,
-        excerpt: data.excerpt || generateExcerpt(data.content),
+        excerpt: data.excerpt || generateExcerpt(markdownContent),
         tags: data.tags || [],
         published: data.published ?? false,
         categoryId,
