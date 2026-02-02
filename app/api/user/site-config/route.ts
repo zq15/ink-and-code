@@ -15,10 +15,11 @@ export async function GET() {
     });
 
     // 如果没有配置，返回默认值
-    // 注意：不返回 ossAccessKeySecret 明文
+    // 注意：不返回 ossAccessKeySecret 明文，BigInt 转为 Number
     const config = siteConfig ? {
       ...siteConfig,
       ossAccessKeySecret: siteConfig.ossAccessKeySecret ? '******' : null,
+      defaultOssUsedBytes: Number(siteConfig.defaultOssUsedBytes),
     } : {
       siteName: null,
       siteTagline: null,
@@ -33,6 +34,8 @@ export async function GET() {
       ossAccessKeySecret: null,
       ossDir: null,
       ossDomain: null,
+      defaultOssUsedBytes: 0,
+      defaultOssUsedCount: 0,
     };
     
     return success(config);
@@ -98,10 +101,11 @@ export async function POST(request: Request) {
       update: updateData,
     });
 
-    // 返回时隐藏 secret
+    // 返回时隐藏 secret，并将 BigInt 转为 Number
     return success({
       ...siteConfig,
       ossAccessKeySecret: siteConfig.ossAccessKeySecret ? '******' : null,
+      defaultOssUsedBytes: Number(siteConfig.defaultOssUsedBytes),
     }, '站点配置更新成功');
   } catch (error) {
     console.error('Failed to update site config:', error);
