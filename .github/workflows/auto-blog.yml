@@ -38,44 +38,35 @@ jobs:
           DIFF=$(cat /tmp/commit_diff.txt | head -c 8000)
           FILES=$(cat /tmp/files_changed.txt)
           
-          # Build prompt - write to file to avoid shell escaping issues
-          cat > /tmp/prompt.txt << 'EOF'
-You are a technical blog writer. Write a blog post in Chinese.
+          # Build prompt
+          PROMPT="You are a technical blog writer. Write a Chinese blog post about this commit.
 
-Commit info will be provided below. Requirements:
-1. Write an attractive Chinese title (no quotes around it)
-2. Use Markdown format
-3. Start content with ## heading directly, NO leading spaces, NO > quotes
-4. Include sections: background, implementation, code explanation, summary
-5. 800-1500 words in Chinese
+Repository: ${REPO_NAME}
+Commit: ${COMMIT_MSG}
+Files: ${FILES}
+Diff: ${DIFF}
 
-IMPORTANT: Output EXACTLY in this format:
+Requirements:
+1. Chinese title without quotes
+2. Markdown format, start with ## headings (NO leading spaces, NO > blockquotes)
+3. Include: background, implementation, summary
+4. 800-1500 words in Chinese
+
+Output format (use these EXACT markers):
 TITLE_START
-你的中文标题
+中文标题
 TITLE_END
 CONTENT_START
 ## 背景
-正文内容...
-## 实现细节
-代码说明...
+内容...
+## 实现
+内容...
 ## 总结
-总结...
+内容...
 CONTENT_END
 TAGS_START
-标签1,标签2,标签3
-TAGS_END
-EOF
-          
-          # Append commit info
-          echo "" >> /tmp/prompt.txt
-          echo "Repository: ${REPO_NAME}" >> /tmp/prompt.txt
-          echo "Commit: ${COMMIT_MSG}" >> /tmp/prompt.txt
-          echo "Files changed:" >> /tmp/prompt.txt
-          echo "${FILES}" >> /tmp/prompt.txt
-          echo "Diff:" >> /tmp/prompt.txt
-          echo "${DIFF}" >> /tmp/prompt.txt
-          
-          PROMPT=$(cat /tmp/prompt.txt)
+标签1,标签2
+TAGS_END"
 
           ESCAPED_PROMPT=$(echo "$PROMPT" | jq -Rs .)
           
