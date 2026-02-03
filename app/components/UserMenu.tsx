@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { LogOut, Settings, User } from 'lucide-react'
+import { LogOut, Settings, User, Shield } from 'lucide-react'
 
 interface UserMenuProps {
   user: {
@@ -15,6 +15,8 @@ interface UserMenuProps {
 
 export default function UserMenu({ user }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [canAccessAdmin, setCanAccessAdmin] = useState(false) // 是否可以访问管理后台（开发者或管理者）
+  const [isDeveloper, setIsDeveloper] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // 点击外部关闭菜单
@@ -26,6 +28,23 @@ export default function UserMenu({ user }: UserMenuProps) {
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // 检查是否是开发者或管理者
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      try {
+        const res = await fetch('/api/admin/verify')
+        const data = await res.json()
+        if (data.code === 200 && data.data?.authorized) {
+          setCanAccessAdmin(true)
+          setIsDeveloper(data.data.isDeveloper === true)
+        }
+      } catch {
+        // 忽略错误
+      }
+    }
+    checkAdminAccess()
   }, [])
 
   return (
@@ -65,6 +84,20 @@ export default function UserMenu({ user }: UserMenuProps) {
               <Settings className="w-4 h-4" />
               <span>管理后台</span>
             </Link>
+            {canAccessAdmin && (
+              <Link
+                href="/developer"
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors cursor-pointer ${
+                  isDeveloper 
+                    ? 'text-primary hover:bg-primary/10' 
+                    : 'text-purple-500 hover:bg-purple-500/10'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>{isDeveloper ? '开发者后台' : '管理后台'}</span>
+              </Link>
+            )}
             <button
               onClick={() => signOut({ callbackUrl: '/' })}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"

@@ -50,6 +50,8 @@ export default async function UserArticlePage({ params }: Props) {
       name: true,
       image: true,
       username: true,
+      bannedAt: true,
+      profileHidden: true,
       siteConfig: {
         select: { siteName: true },
       },
@@ -58,6 +60,28 @@ export default async function UserArticlePage({ params }: Props) {
 
   if (!user) {
     notFound();
+  }
+
+  // 检查用户是否被禁用
+  if (user.bannedAt || user.profileHidden) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="bg-glow" />
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-card border border-card-border flex items-center justify-center">
+            <span className="text-3xl">🚫</span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">内容不可用</h1>
+          <p className="text-muted mb-6">该用户的内容暂时无法访问</p>
+          <a 
+            href="/" 
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
+          >
+            返回首页
+          </a>
+        </div>
+      </div>
+    );
   }
 
   // 获取文章
@@ -71,6 +95,34 @@ export default async function UserArticlePage({ params }: Props) {
 
   if (!post) {
     notFound();
+  }
+
+  // 检查文章是否被禁用或删除
+  if (post.bannedAt || post.deletedByAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="bg-glow" />
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-card border border-card-border flex items-center justify-center">
+            <span className="text-3xl">📄</span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            {post.deletedByAdmin ? '文章已被删除' : '文章暂不可见'}
+          </h1>
+          <p className="text-muted mb-6">
+            {post.deletedByAdmin 
+              ? (post.adminNote || '该文章因违反社区规定已被删除')
+              : (post.banReason || '该文章因内容问题暂时不可见')}
+          </p>
+          <a 
+            href={`/u/${username}`}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
+          >
+            返回作者主页
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (

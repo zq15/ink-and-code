@@ -1,3 +1,12 @@
+/*
+ * :file description: 
+ * :name: /ink-and-code/app/api/article/public-list/route.ts
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ * :date created: 2026-02-02 21:51:47
+ * :last editor: PTC
+ * :date last edited: 2026-02-03 10:33:04
+ */
 import { prisma } from '@/lib/prisma';
 import { success, ApiError } from '@/lib/api-response';
 import crypto from 'crypto';
@@ -30,10 +39,12 @@ export async function GET(request: Request) {
 
     const userId = apiToken.userId;
 
-    // 构建查询条件
+    // 构建查询条件 - 排除被禁用和被删除的文章
     const where: Record<string, unknown> = {
       userId,
       published: true, // 只获取已发布的文章
+      bannedAt: null,  // 排除被禁用的文章
+      deletedByAdmin: false, // 排除被管理员删除的文章
     };
 
     if (categoryId && categoryId !== 'uncategorized') {

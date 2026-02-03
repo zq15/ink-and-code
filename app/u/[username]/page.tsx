@@ -35,7 +35,11 @@ export default async function UserPublicPage({ params }: Props) {
     include: {
       siteConfig: true,
       posts: {
-        where: { published: true },
+        where: { 
+          published: true,
+          bannedAt: null,        // 排除被禁用的文章
+          deletedByAdmin: false, // 排除被管理员删除的文章
+        },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,
@@ -58,6 +62,34 @@ export default async function UserPublicPage({ params }: Props) {
 
   if (!user) {
     notFound();
+  }
+
+  // 检查用户是否被禁用或资料被隐藏
+  if (user.bannedAt || user.profileHidden) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="bg-glow" />
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-3xl bg-card border border-card-border flex items-center justify-center">
+            <span className="text-3xl">🚫</span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            {user.bannedAt ? '该用户已被封禁' : '该用户已隐藏个人资料'}
+          </h1>
+          <p className="text-muted mb-6">
+            {user.bannedAt 
+              ? '该用户因违反社区规定已被封禁，无法查看其内容。' 
+              : '该用户选择隐藏个人资料，暂时无法查看。'}
+          </p>
+          <a 
+            href="/" 
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
+          >
+            返回首页
+          </a>
+        </div>
+      </div>
+    );
   }
 
   const siteConfig = user.siteConfig;

@@ -1,11 +1,13 @@
 # 持续集成 - 代码检查和构建测试
+# 暂时禁用自动触发
 name: CI
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:  # 仅手动触发
+  # push:
+  #   branches: [main, develop]
+  # pull_request:
+  #   branches: [main]
 
 jobs:
   lint-and-build:

@@ -1,4 +1,5 @@
 # Auto generate blog posts from commits with TipTap format
+# Fixed broken pipe error by using head directly instead of cat|head
 name: Auto Blog from Commit
 
 on:
@@ -75,12 +76,13 @@ jobs:
         shell: bash
         run: |
           # Load context files (with size limits)
-          DIFF=$(cat /tmp/commit_diff.txt | head -c 6000)
-          FILES=$(cat /tmp/files_changed.txt)
-          PROJECT_STRUCTURE=$(cat /tmp/project_structure.txt | head -c 3000)
-          CHANGED_FILES_CONTENT=$(cat /tmp/changed_files_content.txt | head -c 15000)
-          KEY_CONFIGS=$(cat /tmp/key_configs.txt | head -c 3000)
-          SKILL_GUIDE=$(cat /tmp/skill_guide.txt | head -c 2000)
+          # Use head directly instead of cat|head to avoid broken pipe errors
+          DIFF=$(head -c 6000 /tmp/commit_diff.txt 2>/dev/null || true)
+          FILES=$(cat /tmp/files_changed.txt 2>/dev/null || true)
+          PROJECT_STRUCTURE=$(head -c 3000 /tmp/project_structure.txt 2>/dev/null || true)
+          CHANGED_FILES_CONTENT=$(head -c 15000 /tmp/changed_files_content.txt 2>/dev/null || true)
+          KEY_CONFIGS=$(head -c 3000 /tmp/key_configs.txt 2>/dev/null || true)
+          SKILL_GUIDE=$(head -c 2000 /tmp/skill_guide.txt 2>/dev/null || true)
           
           # Build comprehensive prompt
           printf '%s\n' "You are a senior technical blog writer with deep understanding of software development." > /tmp/prompt.txt

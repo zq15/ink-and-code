@@ -23,6 +23,18 @@ model User {
   bio           String?   @db.Text // 个人简介
   headline      String?            // 一句话介绍
   
+  // 管理员控制字段
+  bannedAt      DateTime? @map("banned_at")       // 被禁用时间
+  banReason     String?   @map("ban_reason")      // 禁用原因
+  profileHidden Boolean   @default(false) @map("profile_hidden") // 个人资料是否被隐藏
+  
+  // 测试账号字段
+  isTestAccount Boolean   @default(false) @map("is_test_account") // 是否测试账号
+  testLoginCode String?   @unique @map("test_login_code")         // 测试登录码
+  
+  // 管理者权限
+  isAdmin       Boolean   @default(false) @map("is_admin")        // 是否管理者（由开发者分配）
+  
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
@@ -135,6 +147,13 @@ model Post {
   sortOrder  Int       @default(0) @map("sort_order")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
+  
+  // 管理员控制字段
+  bannedAt       DateTime? @map("banned_at")        // 被禁用时间（对外不可见，作者可见）
+  banReason      String?   @map("ban_reason")       // 禁用原因
+  deletedByAdmin Boolean   @default(false) @map("deleted_by_admin") // 被管理员删除
+  adminDeletedAt DateTime? @map("admin_deleted_at") // 管理员删除时间
+  adminNote      String?   @map("admin_note")       // 管理员备注
   
   // 用户关联
   userId     String    @map("user_id")
