@@ -638,7 +638,6 @@ export default function DocTree({
 
     // 乐观更新：先更新本地状态
     const optimisticData = {
-      ...articlesData,
       list: articles.map((article) => {
         if (article.id === draggedArticle.id) {
           // 被拖动的文章：更新 categoryId 和 sortOrder
@@ -651,6 +650,7 @@ export default function DocTree({
         }
         return article;
       }),
+      pagination: articlesData?.pagination ?? { page: 1, limit: 1000, total: articles.length, totalPages: 1 },
     };
 
     // 立即更新本地数据（不重新请求）
