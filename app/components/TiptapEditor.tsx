@@ -15,8 +15,13 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { ResizableImage } from './ResizableImageExtension';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 import { common, createLowlight } from 'lowlight';
 import { useCallback, useEffect, useState, useRef } from 'react';
+import { marked } from 'marked';
 import {
   Bold,
   Italic,
@@ -37,6 +42,10 @@ import {
   Loader2,
   Upload,
   X,
+  Table as TableIcon,
+  Trash2,
+  Columns,
+  Rows,
 } from 'lucide-react';
 import { Toggle } from '@/components/ui/toggle';
 import {
@@ -287,6 +296,25 @@ export default function TiptapEditor({
         lowlight,
         defaultLanguage: 'javascript',
       }),
+      Table.configure({
+        resizable: true,
+        lastColumnResizable: true,
+        allowTableNodeSelection: true,
+        HTMLAttributes: {
+          class: 'tiptap-table',
+        },
+      }),
+      TableRow,
+      TableHeader.configure({
+        HTMLAttributes: {
+          class: 'tiptap-th',
+        },
+      }),
+      TableCell.configure({
+        HTMLAttributes: {
+          class: 'tiptap-td',
+        },
+      }),
     ],
     content: parseContent(content),
     onUpdate: ({ editor }) => {
@@ -338,14 +366,66 @@ export default function TiptapEditor({
     }
   }, [editor, content]);
 
+  // 检测文本是否包含 Markdown 语法
+  const isMarkdownText = useCallback((text: string): boolean => {
+    // 检测常见的 Markdown 语法模式
+    const markdownPatterns = [
+      /^#{1,6}\s+.+$/m,                    // 标题: # ## ### 等
+      /^\s*[-*+]\s+.+$/m,                  // 无序列表: - * +
+      /^\s*\d+\.\s+.+$/m,                  // 有序列表: 1. 2. 等
+      /\*\*[^*]+\*\*/,                     // 粗体: **text**
+      /\*[^*]+\*/,                         // 斜体: *text*
+      /__[^_]+__/,                         // 粗体: __text__
+      /_[^_]+_/,                           // 斜体: _text_
+      /~~[^~]+~~/,                         // 删除线: ~~text~~
+      /`[^`]+`/,                           // 行内代码: `code`
+      /```[\s\S]*?```/,                    // 代码块: ```code```
+      /^\s*>\s+.+$/m,                      // 引用: > text
+      /\[.+\]\(.+\)/,                      // 链接: [text](url)
+      /!\[.*\]\(.+\)/,                     // 图片: ![alt](url)
+      /^\s*---\s*$/m,                      // 分割线: ---
+      /^\s*\*\*\*\s*$/m,                   // 分割线: ***
+      /^\|.+\|$/m,                         // 表格: | col |
+    ];
+
+    // 如果匹配到至少2个模式，认为是 Markdown
+    let matchCount = 0;
+    for (const pattern of markdownPatterns) {
+      if (pattern.test(text)) {
+        matchCount++;
+        if (matchCount >= 2) return true;
+      }
+    }
+
+    // 如果只匹配1个，但文本较长且有多行，也可能是 Markdown
+    if (matchCount >= 1 && text.includes('\n') && text.length > 50) {
+      return true;
+    }
+
+    return false;
+  }, []);
+
+  // 将 Markdown 转换为 HTML
+  const convertMarkdownToHtml = useCallback(async (markdown: string): Promise<string> => {
+    // 配置 marked
+    marked.setOptions({
+      gfm: true,        // 启用 GitHub 风格 Markdown
+      breaks: true,     // 将换行转换为 <br>
+    });
+
+    const html = await marked.parse(markdown);
+    return html;
+  }, []);
+
   // 处理粘贴和拖拽图片
   useEffect(() => {
     if (!editor) return;
 
-    const handlePaste = (event: ClipboardEvent) => {
+    const handlePaste = async (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
 
+      // 首先检查是否有图片
       for (const item of Array.from(items)) {
         if (item.type.startsWith('image/')) {
           event.preventDefault();
@@ -358,6 +438,40 @@ export default function TiptapEditor({
             });
           }
           return;
+        }
+      }
+
+      // 检查是否有纯文本（可能是 Markdown）
+      const plainText = event.clipboardData?.getData('text/plain');
+      const htmlText = event.clipboardData?.getData('text/html');
+
+      // 如果已经有 HTML 格式（比如从网页复制），让 TipTap 默认处理
+      // 但如果纯文本看起来像 Markdown，优先处理 Markdown
+      if (plainText && isMarkdownText(plainText)) {
+        // 检查是否是从富文本编辑器复制的（有 HTML 但不是简单的包装）
+        // 如果 HTML 内容比较复杂（包含格式化标签），则使用默认处理
+        if (htmlText) {
+          const hasRichFormatting = /<(strong|em|b|i|h[1-6]|ul|ol|li|blockquote|pre|code|a|img|table|thead|tbody|tr|th|td)[^>]*>/i.test(htmlText);
+          if (hasRichFormatting) {
+            // 让 TipTap 默认处理富文本
+            return;
+          }
+        }
+
+        event.preventDefault();
+        
+        try {
+          const html = await convertMarkdownToHtml(plainText);
+          // 使用 insertContent 并指定 parseOptions 以确保正确解析 HTML
+          editor.chain().focus().insertContent(html, {
+            parseOptions: {
+              preserveWhitespace: false,
+            },
+          }).run();
+        } catch (error) {
+          console.error('Markdown conversion failed:', error);
+          // 转换失败时，插入纯文本
+          editor.chain().focus().insertContent(plainText).run();
         }
       }
     };
@@ -391,7 +505,7 @@ export default function TiptapEditor({
       editorElement.removeEventListener('paste', handlePaste);
       editorElement.removeEventListener('drop', handleDrop);
     };
-  }, [editor, uploadImage]);
+  }, [editor, uploadImage, isMarkdownText, convertMarkdownToHtml]);
 
   // 格式化 URL，确保包含协议
   const formatUrl = (url: string): string => {
@@ -661,6 +775,53 @@ export default function TiptapEditor({
           >
             <Minus className="size-3.5" />
           </ToolbarToggle>
+        </div>
+
+        <div className="w-px h-4 bg-card-border/60 mx-1" />
+
+        {/* 表格 */}
+        <div className="flex items-center gap-0.5 px-1">
+          <ToolbarToggle
+            pressed={editor.isActive('table')}
+            onPressedChange={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+            tooltip="插入表格 (3x3)"
+          >
+            <TableIcon className="size-3.5" />
+          </ToolbarToggle>
+          {editor.isActive('table') && (
+            <>
+              <ToolbarToggle
+                onPressedChange={() => editor.chain().focus().addColumnAfter().run()}
+                tooltip="右侧添加列"
+              >
+                <Columns className="size-3.5" />
+              </ToolbarToggle>
+              <ToolbarToggle
+                onPressedChange={() => editor.chain().focus().deleteColumn().run()}
+                tooltip="删除当前列"
+              >
+                <Columns className="size-3.5 text-destructive" />
+              </ToolbarToggle>
+              <ToolbarToggle
+                onPressedChange={() => editor.chain().focus().addRowAfter().run()}
+                tooltip="下方添加行"
+              >
+                <Rows className="size-3.5" />
+              </ToolbarToggle>
+              <ToolbarToggle
+                onPressedChange={() => editor.chain().focus().deleteRow().run()}
+                tooltip="删除当前行"
+              >
+                <Rows className="size-3.5 text-destructive" />
+              </ToolbarToggle>
+              <ToolbarToggle
+                onPressedChange={() => editor.chain().focus().deleteTable().run()}
+                tooltip="删除表格"
+              >
+                <Trash2 className="size-3.5" />
+              </ToolbarToggle>
+            </>
+          )}
         </div>
 
         <div className="flex-1" />
