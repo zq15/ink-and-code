@@ -102,8 +102,8 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 获取选中的文章详情
-  const { data: selectedArticle, isLoading: articleLoading } = useArticle(selectedArticleId);
+  // 获取选中的文章详情（未登录时使用公开 API）
+  const { data: selectedArticle, isLoading: articleLoading } = useArticle(selectedArticleId, !isLoggedIn);
 
   // 格式化日期
   const formatDate = (dateStr: string) => {

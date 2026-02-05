@@ -137,10 +137,13 @@ export function usePublicArticleList(options?: Pick<ArticleListOptions, 'categor
 
 /**
  * 获取单篇文章
+ * @param id 文章 ID
+ * @param usePublic 是否使用公开 API（未登录时使用）
  */
-export function useArticle(id: string | null) {
+export function useArticle(id: string | null, usePublic = false) {
+  const endpoint = usePublic ? '/api/article/public-detail' : '/api/article/detail';
   return useSWR<Article, ApiError>(
-    id ? `/api/article/detail?id=${id}` : null,
+    id ? `${endpoint}?id=${id}` : null,
     fetcher
   );
 }
