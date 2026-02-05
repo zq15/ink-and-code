@@ -209,7 +209,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
         </div>
       </aside>
 
-      <div className="h-full flex px-4 md:px-6">
+      <div className="h-full flex px-4 md:px-6 max-w-[1400px] mx-auto">
         {/* 左侧侧边栏 - 仅桌面端显示 */}
         <aside className="w-72 shrink-0 py-4 pr-6 hidden lg:flex lg:flex-col overflow-y-auto">
           <div className="flex-1">
@@ -323,7 +323,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
           className="flex-1 min-w-0 overflow-y-auto py-4 lg:pl-6 lg:border-l border-card-border/30 scrollbar-hide flex flex-col"
         >
           {selectedArticleId && selectedArticle ? (
-            <article className="max-w-4xl">
+            <article className="w-full max-w-4xl">
               {/* 文章头部 */}
               <header className="pb-6 border-b border-card-border/40">
                 <div className="flex flex-wrap items-center gap-3 mb-4 text-[10px] text-muted serif tracking-wider uppercase font-bold">
@@ -385,7 +385,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
               </div>
             </article>
           ) : articleLoading ? (
-            <div className="max-w-4xl bg-card/40 border border-card-border rounded-2xl p-12 animate-pulse space-y-8">
+            <div className="max-w-5xl 2xl:max-w-6xl mx-auto bg-card/40 border border-card-border rounded-2xl p-12 animate-pulse space-y-8">
               <div className="space-y-3">
                 <div className="h-5 w-28 bg-card-border/60 rounded-full" />
                 <div className="h-10 w-3/4 bg-card-border/60 rounded-xl" />

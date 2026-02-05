@@ -5,6 +5,10 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 import { common, createLowlight } from 'lowlight';
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -61,6 +65,26 @@ export default function TiptapRenderer({ content }: TiptapRendererProps) {
         }),
         CodeBlockLowlight.configure({
           lowlight,
+        }),
+        Table.configure({
+          HTMLAttributes: {
+            class: 'border-collapse table-auto w-full my-4',
+          },
+        }),
+        TableRow.configure({
+          HTMLAttributes: {
+            class: 'border-b border-card-border',
+          },
+        }),
+        TableHeader.configure({
+          HTMLAttributes: {
+            class: 'border border-card-border bg-card/50 px-4 py-2 text-left font-semibold',
+          },
+        }),
+        TableCell.configure({
+          HTMLAttributes: {
+            class: 'border border-card-border px-4 py-2',
+          },
         }),
       ]);
       setResult({ isJson: true, html: generatedHtml });
