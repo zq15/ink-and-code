@@ -376,7 +376,7 @@ export default function AdminPage() {
   const showEditor = selectedType === 'article' && selectedId;
 
   return (
-    <div className="fixed inset-0 top-20 flex overflow-hidden bg-background">
+    <div className="fixed inset-0 top-20 flex overflow-hidden bg-background max-w-[1800px] mx-auto">
       {/* 移动端遮罩层 */}
       {!sidebarCollapsed && (
         <div 
@@ -721,8 +721,9 @@ export default function AdminPage() {
                   <p className="text-[10px] font-bold text-muted/40 uppercase tracking-[0.3em] animate-pulse">正在载入资源...</p>
                 </div>
               ) : (
-                <div className="mx-auto pb-12">
-                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                <div className="flex gap-6 2xl:gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                  {/* 编辑器主体 - 撑满 */}
+                  <div className="flex-1 min-w-0">
                     <div className="min-h-[600px] relative">
                       <TiptapEditor
                         key={selectedId || 'new'}
@@ -751,6 +752,80 @@ export default function AdminPage() {
                           </div>
                         }
                       />
+                      </div>
+                    </div>
+
+                    {/* 右侧信息面板 - 大屏显示 */}
+                    <div className="hidden 2xl:block w-64 shrink-0 pt-8 pr-4">
+                    <div className="sticky top-8 space-y-5">
+                      {/* 文档状态卡片 */}
+                      <div className="bg-card/30 backdrop-blur-sm border border-card-border/40 rounded-2xl p-5 space-y-4">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted/50 flex items-center gap-2">
+                          <Layout className="w-3 h-3" />
+                          文档信息
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted/60">状态</span>
+                            <span className={`font-semibold ${form.published ? 'text-green-500' : 'text-yellow-500'}`}>
+                              {form.published ? '已发布' : '草稿'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted/60">字数</span>
+                            <span className="text-foreground/70 font-medium">
+                              {form.content.length.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted/60">阅读时间</span>
+                            <span className="text-foreground/70 font-medium">
+                              约 {Math.max(1, Math.ceil(form.content.length / 400))} 分钟
+                            </span>
+                          </div>
+                          {form.tags && (
+                            <div className="pt-2 border-t border-card-border/30">
+                              <div className="text-[10px] text-muted/50 mb-2">标签</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {form.tags.split(',').filter(t => t.trim()).map((tag, i) => (
+                                  <span key={i} className="text-[10px] bg-primary/5 text-primary/70 px-2 py-0.5 rounded-md border border-primary/10">
+                                    {tag.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 快捷键提示 */}
+                      <div className="bg-card/20 border border-card-border/30 rounded-2xl p-5 space-y-3">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted/50">
+                          快捷键
+                        </div>
+                        <div className="space-y-2">
+                          {[
+                            { key: '⌘ S', desc: '保存文档' },
+                            { key: '⌘ B', desc: '粗体' },
+                            { key: '⌘ I', desc: '斜体' },
+                            { key: '⌘ K', desc: '插入链接' },
+                          ].map(({ key, desc }) => (
+                            <div key={key} className="flex items-center justify-between text-[11px]">
+                              <span className="text-muted/60">{desc}</span>
+                              <kbd className="text-[10px] font-mono bg-card-border/30 text-muted/70 px-1.5 py-0.5 rounded border border-card-border/50">
+                                {key}
+                              </kbd>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 写作提示 */}
+                      <div className="px-2 py-3">
+                        <p className="text-[10px] text-muted/30 serif italic leading-relaxed text-center">
+                          &ldquo;写作是思考的最高形式&rdquo;
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

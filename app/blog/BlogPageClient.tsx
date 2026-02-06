@@ -5,7 +5,7 @@
  * :copyright: (c) 2026, Tungee
  * :date created: 2026-01-30 15:23:36
  * :last editor: PTC
- * :date last edited: 2026-01-30 22:51:20
+ * :date last edited: 2026-02-06 13:44:13
  */
 'use client';
 
@@ -13,6 +13,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Calendar, BookOpen, Clock, Hash, Layout, Search, X, FileText, Loader2 } from 'lucide-react';
 import CategoryNav from '@/app/components/CategoryNav';
 import TiptapRenderer from '@/app/components/TiptapRenderer';
+import TableOfContents from '@/app/components/TableOfContents';
 import { useArticle, useArticleList, usePublicArticleList } from '@/lib/hooks';
 import { useSession } from 'next-auth/react';
 
@@ -209,9 +210,10 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
         </div>
       </aside>
 
-      <div className="h-full flex px-4 md:px-6 max-w-[1400px] mx-auto">
-        {/* 左侧侧边栏 - 仅桌面端显示 */}
-        <aside className="w-72 shrink-0 py-4 pr-6 hidden lg:flex lg:flex-col overflow-y-auto">
+      {/* 调整最大宽度和左右间距，优化大屏体验 */}
+      <div className="h-full flex px-4 md:px-6 lg:px-8 max-w-[1600px] 3xl:max-w-[1800px] mx-auto transition-all duration-300">
+        {/* 左侧侧边栏 - 宽度自适应优化 */}
+        <aside className="w-72 2xl:w-80 shrink-0 py-4 pr-6 hidden lg:flex lg:flex-col overflow-y-auto">
           <div className="flex-1">
             {/* 搜索框 */}
             <div ref={searchContainerRef} className="relative mb-4">
@@ -319,71 +321,145 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
 
         {/* 右侧主内容区域 - 可滚动 */}
         <main 
+          id="article-scroll-container"
           ref={mainRef}
           className="flex-1 min-w-0 overflow-y-auto py-4 lg:pl-6 lg:border-l border-card-border/30 scrollbar-hide flex flex-col"
         >
           {selectedArticleId && selectedArticle ? (
-            <article className="w-full max-w-4xl">
-              {/* 文章头部 */}
-              <header className="pb-6 border-b border-card-border/40">
-                <div className="flex flex-wrap items-center gap-3 mb-4 text-[10px] text-muted serif tracking-wider uppercase font-bold">
-                  <time className="flex items-center gap-1.5 bg-card/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-card-border/50 shadow-xs">
-                    <Calendar className="w-3 h-3" />
-                    {formatDate(selectedArticle.createdAt)}
-                  </time>
-                  {selectedArticle.category && (
-                    <span className="flex items-center gap-1.5 bg-primary/5 text-primary px-3 py-1.5 rounded-full border border-primary/10 shadow-xs">
-                      <Hash className="w-3 h-3" />
-                      {selectedArticle.category.name}
+            <div className="flex gap-6 2xl:gap-10 w-full">
+              {/* 文章内容 */}
+              <article className="flex-1 min-w-0">
+                {/* 文章头部 */}
+                <header className="pb-6 border-b border-card-border/40">
+                  <div className="flex flex-wrap items-center gap-3 mb-4 text-[10px] text-muted serif tracking-wider uppercase font-bold">
+                    <time className="flex items-center gap-1.5 bg-card/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-card-border/50 shadow-xs">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(selectedArticle.createdAt)}
+                    </time>
+                    {selectedArticle.category && (
+                      <span className="flex items-center gap-1.5 bg-primary/5 text-primary px-3 py-1.5 rounded-full border border-primary/10 shadow-xs">
+                        <Hash className="w-3 h-3" />
+                        {selectedArticle.category.name}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <h2 className="text-2xl md:text-3xl lg:text-4xl 2xl:text-5xl font-bold mb-4 serif leading-tight text-foreground tracking-tight">
+                    {selectedArticle.title}
+                  </h2>
+
+                  {selectedArticle.excerpt && (
+                    <div className="relative mb-4">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 rounded-full" />
+                      <p className="text-base md:text-lg 2xl:text-xl text-muted/80 serif leading-relaxed italic pl-5 py-0.5">
+                        {selectedArticle.excerpt}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-5 text-[9px] text-muted/40 font-bold uppercase tracking-[0.2em]">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3" />
+                      {Math.ceil(selectedArticle.content.length / 400)} min read
                     </span>
+                    <span className="w-1 h-1 rounded-full bg-card-border/60" />
+                    <span className="flex items-center gap-1.5">
+                      <BookOpen className="w-3 h-3" />
+                      {selectedArticle.content.length} words
+                    </span>
+                  </div>
+                </header>
+
+                <div className="pb-16">
+                  <div className="max-w-none prose prose-base md:prose-lg 2xl:prose-xl dark:prose-invert">
+                    <TiptapRenderer content={selectedArticle.content} />
+                  </div>
+                  
+                  {/* 底部标签 */}
+                  {selectedArticle.tags && selectedArticle.tags.length > 0 && (
+                    <div className="mt-16 pt-8 border-t border-card-border/60">
+                      <div className="flex flex-wrap gap-3">
+                        {selectedArticle.tags.map((tag: string) => (
+                          <span key={tag} className="text-[10px] font-bold uppercase tracking-[0.2em] bg-card-border/40 hover:bg-card-border/60 px-3 py-1.5 rounded-lg text-muted transition-colors cursor-default">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
-                
-                <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4 serif leading-tight text-foreground tracking-tight">
-                  {selectedArticle.title}
-                </h2>
+              </article>
 
-                {selectedArticle.excerpt && (
-                  <div className="relative mb-4">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 rounded-full" />
-                    <p className="text-base md:text-lg text-muted/80 serif leading-relaxed italic pl-5 py-0.5">
-                      {selectedArticle.excerpt}
-                    </p>
+              {/* 右侧目录/装饰区 - 仅桌面端显示 */}
+              <aside className="hidden xl:block w-64 2xl:w-72 shrink-0">
+                <div className="sticky top-4 space-y-4">
+                  {/* 目录 */}
+                  <div className="bg-card/30 backdrop-blur-sm border border-card-border/40 rounded-2xl p-4 max-h-[calc(100vh-260px)] overflow-y-auto scrollbar-hide">
+                    <TableOfContents content={selectedArticle.content} />
                   </div>
-                )}
 
-                <div className="flex items-center gap-5 text-[9px] text-muted/40 font-bold uppercase tracking-[0.2em]">
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3" />
-                    {Math.ceil(selectedArticle.content.length / 400)} min read
-                  </span>
-                  <span className="w-1 h-1 rounded-full bg-card-border/60" />
-                  <span className="flex items-center gap-1.5">
-                    <BookOpen className="w-3 h-3" />
-                    {selectedArticle.content.length} words
-                  </span>
-                </div>
-              </header>
-
-              <div className="pb-16">
-                <div className="max-w-none prose prose-base dark:prose-invert">
-                  <TiptapRenderer content={selectedArticle.content} />
-                </div>
-                
-                {/* 底部标签 */}
-                {selectedArticle.tags && selectedArticle.tags.length > 0 && (
-                  <div className="mt-16 pt-8 border-t border-card-border/60">
-                    <div className="flex flex-wrap gap-3">
-                      {selectedArticle.tags.map((tag: string) => (
-                        <span key={tag} className="text-[10px] font-bold uppercase tracking-[0.2em] bg-card-border/40 hover:bg-card-border/60 px-3 py-1.5 rounded-lg text-muted transition-colors cursor-default">
-                          #{tag}
+                  {/* 文章信息卡片 */}
+                  <div className="bg-card/20 backdrop-blur-sm border border-card-border/30 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <BookOpen className="w-4 h-4 text-primary/60" />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold text-foreground/80">阅读信息</div>
+                        <div className="text-[10px] text-muted/50">Reading Info</div>
+                      </div>
+                    </div>
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted/60 flex items-center gap-1.5">
+                          <Clock className="w-3 h-3" />
+                          预计阅读
                         </span>
-                      ))}
+                        <span className="text-foreground/70 font-medium">
+                          {Math.ceil(selectedArticle.content.length / 400)} 分钟
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted/60 flex items-center gap-1.5">
+                          <FileText className="w-3 h-3" />
+                          字数统计
+                        </span>
+                        <span className="text-foreground/70 font-medium">
+                          {selectedArticle.content.length.toLocaleString()} 字
+                        </span>
+                      </div>
+                      {selectedArticle.category && (
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted/60 flex items-center gap-1.5">
+                            <Hash className="w-3 h-3" />
+                            所属分类
+                          </span>
+                          <span className="text-primary/70 font-medium">
+                            {selectedArticle.category.name}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted/60 flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3" />
+                          发布日期
+                        </span>
+                        <span className="text-foreground/70 font-medium">
+                          {new Date(selectedArticle.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </article>
+
+                  {/* 底部装饰语 */}
+                  <div className="px-2 py-3">
+                    <p className="text-[10px] text-muted/40 serif italic leading-relaxed text-center">
+                      &ldquo;好的代码自己会说话&rdquo;
+                    </p>
+                  </div>
+                </div>
+              </aside>
+            </div>
           ) : articleLoading ? (
             <div className="max-w-5xl 2xl:max-w-6xl mx-auto bg-card/40 border border-card-border rounded-2xl p-12 animate-pulse space-y-8">
               <div className="space-y-3">

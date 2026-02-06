@@ -63,6 +63,14 @@
 }
 
 @theme inline {
+  /* 自定义断点 - 大屏适配 */
+  --breakpoint-3xl: 1920px;
+  
+  /* 自定义最大宽度 */
+  --container-8xl: 90rem;  /* 1440px */
+  --container-9xl: 100rem; /* 1600px */
+  --container-10xl: 112.5rem; /* 1800px */
+  
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -734,6 +742,16 @@ pre code {
   .tiptap-content hr {
     margin: 3rem 0;
   }
+}
+
+/* 标题锚点滚动偏移，避免被顶部导航遮挡 */
+.tiptap-content h1,
+.tiptap-content h2,
+.tiptap-content h3,
+.tiptap-content h4,
+.tiptap-content h5,
+.tiptap-content h6 {
+  scroll-margin-top: 100px;
 }
 
 /* 隐藏滚动条但保留滚动功能 */

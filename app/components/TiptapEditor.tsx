@@ -845,18 +845,20 @@ export default function TiptapEditor({
         </div>
       </div>
 
-      {/* 内容区域（带 padding） */}
-      <div className="flex-1 px-10 py-8">
-        {/* 头部内容区（标题、摘要等） */}
-        {headerContent && (
-          <div className="mb-4">
-            {headerContent}
-          </div>
-        )}
+      {/* 内容区域 - 语雀风格：标题和正文在同一居中容器内 */}
+      <div className="flex-1 px-6 md:px-10 2xl:px-16 py-8">
+        <div className="max-w-[900px] mx-auto">
+          {/* 头部内容区（标题、摘要等） */}
+          {headerContent && (
+            <div className="mb-4">
+              {headerContent}
+            </div>
+          )}
 
-        {/* 编辑区容器 */}
-        <div className="flex-1">
-          <EditorContent editor={editor} className="tiptap-editor-content" />
+          {/* 编辑区容器 */}
+          <div className="flex-1">
+            <EditorContent editor={editor} className="tiptap-editor-content" />
+          </div>
         </div>
       </div>
 

@@ -40,7 +40,7 @@ export default function Header() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-8">
+      <nav className="max-w-7xl 2xl:max-w-[1600px] min-[1920px]:max-w-[2000px] min-[2200px]:max-w-[2200px] mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between gap-4 sm:gap-8">
         <Link 
           href="/" 
           className="serif text-xl sm:text-2xl font-bold tracking-tighter hover:opacity-70 transition-opacity shrink-0"

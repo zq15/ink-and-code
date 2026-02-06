@@ -1,3 +1,12 @@
+/*
+ * :file description: 
+ * :name: /ink-and-code/app/about/page.tsx
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ * :date created: 2026-01-28 16:18:21
+ * :last editor: PTC
+ * :date last edited: 2026-02-06 13:43:15
+ */
 import Link from 'next/link';
 
 export const metadata = {
@@ -9,7 +18,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen pt-40 pb-32 px-6 relative">
       <div className="bg-glow" />
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-[2000px] min-[2200px]:max-w-[2200px] mx-auto">
         <div className="grid lg:grid-cols-[1.2fr_1fr] gap-24 items-start">
           {/* Content Left */}
           <div className="space-y-20">

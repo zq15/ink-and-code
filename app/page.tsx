@@ -22,7 +22,7 @@ export default async function LandingPage() {
           <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-500/5 rounded-full blur-[100px]" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 w-full relative z-10 flex flex-col items-center justify-center min-h-[100svh] pt-24 pb-12">
+        <div className="max-w-7xl 2xl:max-w-[1600px] min-[1920px]:max-w-[2000px] min-[2200px]:max-w-[2200px] mx-auto px-4 sm:px-6 w-full relative z-10 flex flex-col items-center justify-center min-h-[100svh] pt-24 pb-12">
           {/* 标签 */}
           <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 border border-primary/20 rounded-full mb-8 animate-fade-up">
             <Sparkles className="w-4 h-4 text-primary" />
@@ -96,7 +96,7 @@ export default async function LandingPage() {
 
       {/* FEATURES SECTION */}
       <section id="features" className="relative py-24 md:py-32 px-4 sm:px-6 border-t border-card-border">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl 2xl:max-w-[1600px] min-[1920px]:max-w-[2000px] min-[2200px]:max-w-[2200px] mx-auto">
           <div className="text-center mb-16 md:mb-24">
             <div className="flex items-center justify-center gap-4 mb-6">
               <div className="h-px w-12 bg-primary/30" />
@@ -173,7 +173,7 @@ export default async function LandingPage() {
 
       {/* HOW IT WORKS */}
       <section className="relative py-24 md:py-32 px-4 sm:px-6 border-t border-card-border bg-card/20">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl 2xl:max-w-[1600px] min-[1920px]:max-w-[2000px] min-[2200px]:max-w-[2200px] mx-auto">
           <div className="text-center mb-16 md:mb-24">
             <div className="flex items-center justify-center gap-4 mb-6">
               <div className="h-px w-12 bg-primary/30" />
@@ -219,7 +219,7 @@ export default async function LandingPage() {
 
       {/* DEVELOPER SECTION */}
       <section id="developer" className="relative py-24 md:py-32 px-4 sm:px-6 border-t border-card-border">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl 2xl:max-w-[1600px] min-[1920px]:max-w-[2000px] min-[2200px]:max-w-[2200px] mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div className="space-y-8">
               <div className="space-y-4">
@@ -295,7 +295,7 @@ export default async function LandingPage() {
 
       {/* FINAL CTA */}
       <section className="relative py-24 md:py-32 px-4 sm:px-6 border-t border-card-border bg-gradient-to-b from-primary/5 to-transparent">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-4xl 2xl:max-w-5xl min-[1920px]:max-w-6xl min-[2200px]:max-w-7xl mx-auto text-center">
           <h2 className="serif text-4xl sm:text-5xl md:text-6xl font-bold text-foreground tracking-tight mb-6">
             准备好开始了吗？
           </h2>
