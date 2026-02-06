@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { MessageCircle, X, Send, Loader2, Bot, User } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Bot, User, ChevronsRight, ChevronsLeft } from 'lucide-react';
 import type { UIMessage } from 'ai';
 
 // 从 UIMessage 的 parts 中提取文本内容
@@ -18,6 +18,7 @@ function getMessageText(message: UIMessage): string {
 
 export default function ChatAssistant() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isTucked, setIsTucked] = useState(false);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,27 +43,62 @@ export default function ChatAssistant() {
 
   return (
     <>
-      {/* 浮动按钮 */}
+      {/* 收起到右侧边缘时的小标签 */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center ${
-          isOpen
-            ? 'bg-card-border text-foreground rotate-90'
-            : 'bg-primary text-background hover:scale-110'
+        onClick={() => setIsTucked(false)}
+        className={`fixed bottom-6 z-50 transition-all duration-300 ease-in-out cursor-pointer ${
+          isTucked 
+            ? 'right-0 opacity-100' 
+            : 'right-[-60px] opacity-0 pointer-events-none'
         }`}
-        aria-label={isOpen ? '关闭对话' : '打开 AI 助手'}
+        aria-label="展开 AI 助手"
       >
-        {isOpen ? (
-          <X className="w-6 h-6" />
-        ) : (
-          <MessageCircle className="w-6 h-6" />
-        )}
+        <div className="flex items-center gap-1 bg-primary text-background pl-2.5 pr-1.5 py-2.5 rounded-l-xl shadow-lg hover:pr-3 transition-all duration-200">
+          <ChevronsLeft className="w-4 h-4" />
+          <MessageCircle className="w-4 h-4" />
+        </div>
       </button>
+
+      {/* 浮动按钮 + 收起到边缘的按钮 */}
+      <div
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 transition-all duration-300 ease-in-out ${
+          isTucked ? 'translate-x-[80px] opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'
+        }`}
+      >
+        {/* 收起到边缘的小按钮 */}
+        {!isOpen && (
+          <button
+            onClick={() => setIsTucked(true)}
+            className="w-7 h-7 rounded-full bg-card/80 backdrop-blur-sm border border-card-border/40 shadow-md flex items-center justify-center text-muted/50 hover:text-muted/80 hover:bg-card transition-colors cursor-pointer"
+            aria-label="藏到边缘"
+            title="收起到右侧"
+          >
+            <ChevronsRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+        
+        {/* 主按钮 */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`w-14 h-14 rounded-full shadow-lg transition-all duration-300 flex items-center justify-center cursor-pointer ${
+            isOpen
+              ? 'bg-card-border text-foreground rotate-90'
+              : 'bg-primary text-background hover:scale-110'
+          }`}
+          aria-label={isOpen ? '关闭对话' : '打开 AI 助手'}
+        >
+          {isOpen ? (
+            <X className="w-6 h-6" />
+          ) : (
+            <MessageCircle className="w-6 h-6" />
+          )}
+        </button>
+      </div>
 
       {/* 对话面板 */}
       <div
-        className={`fixed bottom-24 right-6 z-50 w-[380px] h-[500px] bg-card border border-card-border rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
-          isOpen
+        className={`fixed z-50 bg-card border border-card-border rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 bottom-20 right-3 left-3 h-[calc(100vh-140px)] sm:bottom-24 sm:right-6 sm:left-auto sm:w-[380px] sm:h-[500px] ${
+          isOpen && !isTucked
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
         }`}

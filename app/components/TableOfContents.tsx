@@ -1,5 +1,5 @@
 /*
- * :file description: 文章目录组件 - 显示文章标题层级，支持点击跳转
+ * :file description: 文章目录组件 - 显示文章标题层级，支持点击跳转，大标题可折叠子标题
  * :name: /ink-and-code/app/components/TableOfContents.tsx
  * :author: PTC
  * :copyright: (c) 2026, Tungee
@@ -9,7 +9,7 @@
  */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { List, ChevronRight } from 'lucide-react';
 
 interface TocItem {
@@ -21,6 +21,7 @@ interface TocItem {
 interface TableOfContentsProps {
   content: string;
   className?: string;
+  onHeadingsChange?: (count: number) => void;
 }
 
 // 获取标题级别对应的样式
@@ -36,9 +37,11 @@ function getHeadingStyles(level: number, minLevel: number) {
   };
 }
 
-export default function TableOfContents({ content, className = '' }: TableOfContentsProps) {
+export default function TableOfContents({ content, className = '', onHeadingsChange }: TableOfContentsProps) {
   const [headings, setHeadings] = useState<TocItem[]>([]);
   const [activeId, setActiveId] = useState<string>('');
+  // 记录哪些大标题被折叠了（存储大标题的 id）
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   // 从渲染后的 DOM 中提取标题，确保顺序和 ID 完全匹配
   useEffect(() => {
@@ -68,10 +71,11 @@ export default function TableOfContents({ content, className = '' }: TableOfCont
       });
 
       setHeadings(extractedHeadings);
+      onHeadingsChange?.(extractedHeadings.length);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [content]);
+  }, [content, onHeadingsChange]);
 
   // 监听滚动，高亮当前可见的标题
   useEffect(() => {
@@ -115,12 +119,10 @@ export default function TableOfContents({ content, className = '' }: TableOfCont
     const scrollContainer = document.getElementById('article-scroll-container');
     
     if (element && scrollContainer) {
-      // 计算元素相对于滚动容器的位置
       const containerRect = scrollContainer.getBoundingClientRect();
       const elementRect = element.getBoundingClientRect();
       const relativeTop = elementRect.top - containerRect.top + scrollContainer.scrollTop;
       
-      // 滚动到目标位置，留出顶部空间
       scrollContainer.scrollTo({
         top: relativeTop - 24,
         behavior: 'smooth'
@@ -129,18 +131,69 @@ export default function TableOfContents({ content, className = '' }: TableOfCont
     }
   }, []);
 
+  // 切换大标题的折叠状态
+  const toggleSection = useCallback((headingId: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(headingId)) {
+        next.delete(headingId);
+      } else {
+        next.add(headingId);
+      }
+      return next;
+    });
+  }, []);
+
+  // 计算每个标题的可见性：子标题在其父级大标题折叠时隐藏
+  const { minLevel, visibilityMap, hasChildren } = useMemo(() => {
+    if (headings.length === 0) {
+      return { minLevel: 1, visibilityMap: new Map<string, boolean>(), hasChildren: new Set<string>() };
+    }
+
+    const min = Math.min(...headings.map(h => h.level));
+    const visibility = new Map<string, boolean>();
+    const childrenSet = new Set<string>();
+
+    // 先标记哪些大标题有子标题
+    for (let i = 0; i < headings.length; i++) {
+      if (headings[i].level === min) {
+        // 检查后面是否有子标题
+        if (i + 1 < headings.length && headings[i + 1].level > min) {
+          childrenSet.add(headings[i].id);
+        }
+      }
+    }
+
+    // 计算可见性
+    let currentParentId: string | null = null;
+    for (const heading of headings) {
+      if (heading.level === min) {
+        // 大标题始终可见
+        visibility.set(heading.id, true);
+        currentParentId = heading.id;
+      } else {
+        // 子标题：如果父级大标题被折叠则隐藏
+        const isHidden = currentParentId !== null && collapsedSections.has(currentParentId);
+        visibility.set(heading.id, !isHidden);
+      }
+    }
+
+    return { minLevel: min, visibilityMap: visibility, hasChildren: childrenSet };
+  }, [headings, collapsedSections]);
+
   if (headings.length === 0) {
     return null;
   }
 
-  // 找到最小的标题级别
-  const minLevel = Math.min(...headings.map(h => h.level));
-
   return (
     <nav className={className}>
-      <div className="flex items-center gap-2 mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted/60">
-        <List className="w-3 h-3" />
-        <span>目录</span>
+      {/* 标题栏 */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-muted/60">
+          <List className="w-3 h-3" />
+          <span>目录</span>
+        </div>
+        <span className="text-[10px] text-muted/40">{headings.length} 项</span>
       </div>
       
       <div className="relative">
@@ -152,11 +205,19 @@ export default function TableOfContents({ content, className = '' }: TableOfCont
             const isActive = activeId === heading.id;
             const styles = getHeadingStyles(heading.level, minLevel);
             const relativeLevel = heading.level - minLevel;
+            const isVisible = visibilityMap.get(heading.id) ?? true;
+            const isTopLevel = heading.level === minLevel;
+            const isSectionCollapsed = collapsedSections.has(heading.id);
+            const sectionHasChildren = hasChildren.has(heading.id);
             
             return (
               <li 
                 key={heading.id} 
-                className="relative"
+                className={`relative transition-all duration-200 ${
+                  isVisible 
+                    ? 'max-h-20 opacity-100' 
+                    : 'max-h-0 opacity-0 overflow-hidden'
+                }`}
                 style={{ paddingLeft: `${styles.indent + 20}px` }}
               >
                 {/* 层级指示点 */}
@@ -174,51 +235,56 @@ export default function TableOfContents({ content, className = '' }: TableOfCont
                   style={{ marginLeft: `${styles.indent + 4}px` }}
                 />
                 
-                <button
-                  onClick={() => scrollToHeading(heading.id)}
-                  className={`
-                    group flex items-start gap-1.5 w-full text-left py-1.5 pr-2 rounded-md
-                    transition-all duration-200 hover:bg-card/60 cursor-pointer
-                    ${styles.fontSize} ${styles.fontWeight} ${styles.opacity}
-                    ${isActive
-                      ? 'text-primary'
-                      : 'text-muted/80 hover:text-foreground'
-                    }
-                  `}
-                >
-                  {/* 一级标题显示箭头 */}
-                  {relativeLevel === 0 && (
+                <div className="flex items-center">
+                  {/* 大标题的折叠按钮 */}
+                  {isTopLevel && sectionHasChildren ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSection(heading.id);
+                      }}
+                      className="shrink-0 mr-0.5 cursor-pointer"
+                    >
+                      <ChevronRight 
+                        className={`
+                          w-3 h-3 transition-transform duration-200
+                          ${isSectionCollapsed 
+                            ? 'text-muted/50' 
+                            : isActive 
+                              ? 'text-primary rotate-90' 
+                              : 'text-muted/30 rotate-90'
+                          }
+                        `}
+                      />
+                    </button>
+                  ) : isTopLevel ? (
                     <ChevronRight 
                       className={`
-                        w-3 h-3 mt-0.5 shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-primary rotate-90' : 'text-muted/30'}
+                        w-3 h-3 mr-0.5 shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-primary rotate-90' : 'text-muted/30 rotate-90'}
                       `}
                     />
-                  )}
-                  <span className="line-clamp-2 leading-relaxed">{heading.text}</span>
-                </button>
+                  ) : null}
+                  
+                  <button
+                    onClick={() => scrollToHeading(heading.id)}
+                    className={`
+                      flex-1 text-left py-1.5 pr-2 rounded-md
+                      transition-all duration-200 hover:bg-card/60 cursor-pointer
+                      ${styles.fontSize} ${styles.fontWeight} ${styles.opacity}
+                      ${isActive
+                        ? 'text-primary'
+                        : 'text-muted/80 hover:text-foreground'
+                      }
+                    `}
+                  >
+                    <span className="line-clamp-2 leading-relaxed">{heading.text}</span>
+                  </button>
+                </div>
               </li>
             );
           })}
         </ul>
-      </div>
-      
-      {/* 显示目录统计 */}
-      <div className="mt-4 pt-3 border-t border-card-border/30">
-        <div className="text-[10px] text-muted/50 space-y-0.5">
-          {(() => {
-            const h1Count = headings.filter(h => h.level === minLevel).length;
-            const h2Count = headings.filter(h => h.level === minLevel + 1).length;
-            const h3Count = headings.filter(h => h.level === minLevel + 2).length;
-            return (
-              <>
-                {h1Count > 0 && <div>{h1Count} 个主标题</div>}
-                {h2Count > 0 && <div>{h2Count} 个二级标题</div>}
-                {h3Count > 0 && <div>{h3Count} 个三级标题</div>}
-              </>
-            );
-          })()}
-        </div>
       </div>
     </nav>
   );

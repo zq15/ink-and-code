@@ -9,8 +9,8 @@
  */
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Calendar, BookOpen, Clock, Hash, Layout, Search, X, FileText, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Calendar, BookOpen, Clock, Hash, Layout, Search, X, FileText, Loader2, ChevronDown } from 'lucide-react';
 import CategoryNav from '@/app/components/CategoryNav';
 import TiptapRenderer from '@/app/components/TiptapRenderer';
 import TableOfContents from '@/app/components/TableOfContents';
@@ -144,6 +144,14 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
   };
 
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [showReadingInfo, setShowReadingInfo] = useState(false);
+  const [hasToc, setHasToc] = useState(false);
+  const handleHeadingsChange = useCallback((count: number) => {
+    const has = count > 0;
+    setHasToc(has);
+    // 有目录时默认收起阅读信息，无目录时默认展开
+    setShowReadingInfo(!has);
+  }, []);
 
   return (
     <div className="min-h-screen pt-16 sm:pt-20 bg-background/50 lg:h-screen lg:overflow-hidden">
@@ -326,9 +334,9 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
           className="flex-1 min-w-0 overflow-y-auto py-4 lg:pl-6 lg:border-l border-card-border/30 scrollbar-hide flex flex-col"
         >
           {selectedArticleId && selectedArticle ? (
-            <div className="flex gap-6 2xl:gap-10 w-full">
+            <>
               {/* 文章内容 */}
-              <article className="flex-1 min-w-0">
+              <article className="flex-1 min-w-0 xl:pr-6 2xl:pr-10">
                 {/* 文章头部 */}
                 <header className="pb-6 border-b border-card-border/40">
                   <div className="flex flex-wrap items-center gap-3 mb-4 text-[10px] text-muted serif tracking-wider uppercase font-bold">
@@ -389,77 +397,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
                   )}
                 </div>
               </article>
-
-              {/* 右侧目录/装饰区 - 仅桌面端显示 */}
-              <aside className="hidden xl:block w-64 2xl:w-72 shrink-0">
-                <div className="sticky top-4 space-y-4">
-                  {/* 目录 */}
-                  <div className="bg-card/30 backdrop-blur-sm border border-card-border/40 rounded-2xl p-4 max-h-[calc(100vh-260px)] overflow-y-auto scrollbar-hide">
-                    <TableOfContents content={selectedArticle.content} />
-                  </div>
-
-                  {/* 文章信息卡片 */}
-                  <div className="bg-card/20 backdrop-blur-sm border border-card-border/30 rounded-2xl p-5 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <BookOpen className="w-4 h-4 text-primary/60" />
-                      </div>
-                      <div>
-                        <div className="text-[11px] font-semibold text-foreground/80">阅读信息</div>
-                        <div className="text-[10px] text-muted/50">Reading Info</div>
-                      </div>
-                    </div>
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted/60 flex items-center gap-1.5">
-                          <Clock className="w-3 h-3" />
-                          预计阅读
-                        </span>
-                        <span className="text-foreground/70 font-medium">
-                          {Math.ceil(selectedArticle.content.length / 400)} 分钟
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted/60 flex items-center gap-1.5">
-                          <FileText className="w-3 h-3" />
-                          字数统计
-                        </span>
-                        <span className="text-foreground/70 font-medium">
-                          {selectedArticle.content.length.toLocaleString()} 字
-                        </span>
-                      </div>
-                      {selectedArticle.category && (
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted/60 flex items-center gap-1.5">
-                            <Hash className="w-3 h-3" />
-                            所属分类
-                          </span>
-                          <span className="text-primary/70 font-medium">
-                            {selectedArticle.category.name}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-muted/60 flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3" />
-                          发布日期
-                        </span>
-                        <span className="text-foreground/70 font-medium">
-                          {new Date(selectedArticle.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 底部装饰语 */}
-                  <div className="px-2 py-3">
-                    <p className="text-[10px] text-muted/40 serif italic leading-relaxed text-center">
-                      &ldquo;好的代码自己会说话&rdquo;
-                    </p>
-                  </div>
-                </div>
-              </aside>
-            </div>
+            </>
           ) : articleLoading ? (
             <div className="max-w-5xl 2xl:max-w-6xl mx-auto bg-card/40 border border-card-border rounded-2xl p-12 animate-pulse space-y-8">
               <div className="space-y-3">
@@ -543,6 +481,80 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
             </>
           )}
         </main>
+
+        {/* 右侧目录/装饰区 - 独立于文章滚动，仅桌面端显示 */}
+        {selectedArticleId && selectedArticle && (
+          <aside className="hidden xl:block w-64 2xl:w-72 shrink-0 overflow-y-auto scrollbar-hide py-4 overscroll-contain">
+            <div className="space-y-3">
+              {/* 阅读信息 - 在目录上方，可折叠（有目录时默认收起） */}
+              <div className="bg-card/30 backdrop-blur-sm border border-card-border/40 rounded-2xl overflow-hidden">
+                <button
+                  onClick={() => setShowReadingInfo(!showReadingInfo)}
+                  className="flex items-center justify-between w-full px-4 py-3 cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <BookOpen className="w-3 h-3 text-primary/60" />
+                    </div>
+                    <span className="text-[11px] font-semibold text-foreground/80">阅读信息</span>
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted/40 transition-transform duration-300 group-hover:text-muted/60 ${showReadingInfo ? '' : '-rotate-90'}`} />
+                </button>
+                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showReadingInfo ? 'max-h-60 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="px-4 pb-4 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted/60 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        预计阅读
+                      </span>
+                      <span className="text-foreground/70 font-medium">
+                        {Math.ceil(selectedArticle.content.length / 400)} 分钟
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted/60 flex items-center gap-1.5">
+                        <FileText className="w-3 h-3" />
+                        字数统计
+                      </span>
+                      <span className="text-foreground/70 font-medium">
+                        {selectedArticle.content.length.toLocaleString()} 字
+                      </span>
+                    </div>
+                    {selectedArticle.category && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted/60 flex items-center gap-1.5">
+                          <Hash className="w-3 h-3" />
+                          所属分类
+                        </span>
+                        <span className="text-primary/70 font-medium">
+                          {selectedArticle.category.name}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted/60 flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3" />
+                        发布日期
+                      </span>
+                      <span className="text-foreground/70 font-medium">
+                        {new Date(selectedArticle.createdAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 目录区域 */}
+              {hasToc ? (
+                <div className="bg-card/30 backdrop-blur-sm border border-card-border/40 rounded-2xl p-4">
+                  <TableOfContents content={selectedArticle.content} onHeadingsChange={handleHeadingsChange} />
+                </div>
+              ) : (
+                <TableOfContents content={selectedArticle.content} onHeadingsChange={handleHeadingsChange} />
+              )}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
