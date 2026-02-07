@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Palette, RotateCcw, Sun, Moon, Monitor, ChevronDown, Check } from 'lucide-react';
 import { HexColorPicker, HexColorInput } from 'react-colorful';
 import { useTheme, type ThemeColors } from './ThemeProvider';
@@ -246,18 +247,9 @@ export default function ThemeCustomizer() {
     setCustomColor(key, value);
   };
 
-  return (
+  // 遮罩层 + 面板通过 portal 渲染到 body，避免被 header 的 backdrop-filter 创建的层叠上下文限制
+  const panelContent = (
     <>
-      {/* 触发按钮 */}
-      <button
-        onClick={() => setCustomizerOpen(true)}
-        className="relative w-10 h-10 rounded-full border border-card-border bg-card hover:border-primary/30 transition-all duration-300 flex items-center justify-center cursor-pointer group"
-        aria-label="自定义主题"
-        type="button"
-      >
-        <Palette className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
-      </button>
-
       {/* 遮罩层 */}
       <div
         className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[199] transition-opacity duration-300 ${
@@ -478,6 +470,23 @@ export default function ThemeCustomizer() {
           </p>
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* 触发按钮 */}
+      <button
+        onClick={() => setCustomizerOpen(true)}
+        className="relative w-10 h-10 rounded-full border border-card-border bg-card hover:border-primary/30 transition-all duration-300 flex items-center justify-center cursor-pointer group"
+        aria-label="自定义主题"
+        type="button"
+      >
+        <Palette className="w-4 h-4 text-muted group-hover:text-primary transition-colors" />
+      </button>
+
+      {/* Portal: 渲染到 body，避免 header 的 backdrop-filter 层叠上下文问题 */}
+      {mounted && createPortal(panelContent, document.body)}
     </>
   );
 }
