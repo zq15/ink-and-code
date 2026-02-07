@@ -5,7 +5,7 @@
  * :copyright: (c) 2026, Tungee
  * :date created: 2026-01-30 15:23:36
  * :last editor: PTC
- * :date last edited: 2026-02-06 13:44:13
+ * :date last edited: 2026-02-07 09:22:42
  */
 'use client';
 
@@ -304,7 +304,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
               )}
             </div>
 
-            <div className="flex items-center gap-2 px-1 mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted/60">
+            <div className="flex items-center gap-2 px-1 mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted/80">
               <Layout className="w-3 h-3" />
               <span>文档目录</span>
             </div>
@@ -321,7 +321,7 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
           {/* 底部提示 */}
           <div className="mt-6 bg-primary/5 border border-primary/10 rounded-2xl p-5 space-y-2">
             <h4 className="text-sm font-semibold text-primary/80">沉浸阅读</h4>
-            <p className="text-xs text-muted/80 leading-relaxed serif italic">
+            <p className="text-xs text-muted leading-relaxed serif italic">
               &ldquo;代码是写给人看的，顺便给机器执行。&rdquo; —— 这里的每一篇文章都致力于清晰的表达。
             </p>
           </div>
@@ -359,13 +359,13 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
                   {selectedArticle.excerpt && (
                     <div className="relative mb-4">
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/20 rounded-full" />
-                      <p className="text-base md:text-lg 2xl:text-xl text-muted/80 serif leading-relaxed italic pl-5 py-0.5">
+                      <p className="text-base md:text-lg 2xl:text-xl text-muted serif leading-relaxed italic pl-5 py-0.5">
                         {selectedArticle.excerpt}
                       </p>
                     </div>
                   )}
 
-                  <div className="flex items-center gap-5 text-[9px] text-muted/40 font-bold uppercase tracking-[0.2em]">
+                  <div className="flex items-center gap-5 text-[9px] text-muted/60 font-bold uppercase tracking-[0.2em]">
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-3 h-3" />
                       {Math.ceil(selectedArticle.content.length / 400)} min read

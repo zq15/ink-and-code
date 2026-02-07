@@ -7,29 +7,29 @@
 /* 暗色主题（默认） */
 :root,
 [data-theme="dark"] {
-  --background: #030303;
-  --foreground: #ececec;
-  --card: #0a0a0a;
-  --card-border: #1a1a1a;
-  --card-foreground: #ececec;
+  --background: #0c0c0c;
+  --foreground: #f0f0f0;
+  --card: #161616;
+  --card-border: #2a2a2a;
+  --card-foreground: #f0f0f0;
   --primary: #d4a373;
   --primary-foreground: #030303;
   --primary-glow: rgba(212, 163, 115, 0.15);
-  --secondary: #1a1a1a;
-  --secondary-foreground: #ececec;
-  --muted: #888888;
-  --muted-foreground: #888888;
-  --accent: #1a1a1a;
-  --accent-foreground: #ececec;
+  --secondary: #222222;
+  --secondary-foreground: #f0f0f0;
+  --muted: #a0a0a0;
+  --muted-foreground: #a0a0a0;
+  --accent: #222222;
+  --accent-foreground: #f0f0f0;
   --destructive: #ef4444;
-  --border: #1a1a1a;
-  --input: #1a1a1a;
+  --border: #2a2a2a;
+  --input: #222222;
   --ring: #d4a373;
   --radius: 0.5rem;
-  --popover: #0a0a0a;
-  --popover-foreground: #ececec;
-  --glass-bg: rgba(3, 3, 3, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.03);
+  --popover: #161616;
+  --popover-foreground: #f0f0f0;
+  --glass-bg: rgba(12, 12, 12, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.06);
   --noise-opacity: 0.02;
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: Georgia, "Times New Roman", serif;
@@ -538,8 +538,9 @@ pre code {
 
 .tiptap-content p {
   margin: 0.75rem 0;
-  line-height: 1.7;
-  color: var(--muted);
+  line-height: 1.8;
+  color: var(--foreground);
+  opacity: 0.85;
   font-size: 0.9rem;
   word-break: break-word;
 }
@@ -547,20 +548,22 @@ pre code {
 .tiptap-content ul {
   padding-left: 1.25rem;
   margin: 0.75rem 0;
-  color: var(--muted);
+  color: var(--foreground);
+  opacity: 0.85;
   list-style-type: disc;
 }
 
 .tiptap-content ol {
   padding-left: 1.25rem;
   margin: 0.75rem 0;
-  color: var(--muted);
+  color: var(--foreground);
+  opacity: 0.85;
   list-style-type: decimal;
 }
 
 .tiptap-content li {
   margin: 0.4rem 0;
-  line-height: 1.6;
+  line-height: 1.7;
   display: list-item;
   font-size: 0.9rem;
   word-break: break-word;
@@ -581,6 +584,7 @@ pre code {
 
 .tiptap-content blockquote p {
   color: var(--muted);
+  opacity: 1;
   margin: 0.4rem 0;
 }
 
@@ -670,7 +674,8 @@ pre code {
 
 .tiptap-content td {
   background: var(--background);
-  color: var(--muted);
+  color: var(--foreground);
+  opacity: 0.85;
 }
 
 .tiptap-content tr:hover td {
@@ -696,6 +701,7 @@ pre code {
   
   .tiptap-content p {
     font-size: 1rem;
+    line-height: 1.85;
     margin: 0.85rem 0;
   }
   
@@ -752,6 +758,29 @@ pre code {
 .tiptap-content h5,
 .tiptap-content h6 {
   scroll-margin-top: 100px;
+}
+
+/* react-colorful 颜色选择器样式 */
+.theme-color-picker .react-colorful {
+  width: 100% !important;
+  height: 150px !important;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.theme-color-picker .react-colorful__saturation {
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.theme-color-picker .react-colorful__hue {
+  height: 14px;
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.theme-color-picker .react-colorful__pointer {
+  width: 18px;
+  height: 18px;
+  border-width: 3px;
 }
 
 /* 隐藏滚动条但保留滚动功能 */

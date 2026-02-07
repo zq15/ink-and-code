@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import ThemeToggle from './ThemeToggle';
+import ThemeCustomizer from './ThemeCustomizer';
 import UserMenu from './UserMenu';
 import { Github, LogIn, Menu, X } from 'lucide-react';
 
@@ -81,7 +81,7 @@ export default function Header() {
             <Github className="w-5 h-5" />
           </a>
           
-          <ThemeToggle />
+          <ThemeCustomizer />
 
           {/* 用户认证状态 */}
           {status === 'loading' ? (
