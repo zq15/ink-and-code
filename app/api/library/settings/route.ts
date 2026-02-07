@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getCurrentUserId, success, ApiError } from '@/lib/api-response';
+import { getCurrentUserId, requireAuth, success, ApiError } from '@/lib/api-response';
 
 /**
  * GET /api/library/settings
