@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { fetcher, post } from '@/lib/fetcher';
@@ -116,27 +117,209 @@ export function useBookDetail(id: string | null) {
   return { book: data, isLoading, error, mutate };
 }
 
+// 不需要服务端转换、可直传 OSS 的格式
+const DIRECT_UPLOAD_FORMATS = new Set(['epub', 'pdf', 'txt', 'md', 'markdown', 'html', 'htm']);
+
 /**
- * 上传书籍
+ * 上传书籍（两级策略）
+ * - 简单格式 (epub/pdf/txt/md/html)：presign + 浏览器直传 OSS，跳过服务端中转
+ * - 转换格式 (docx/mobi/azw3)：走服务端代理上传 + 格式转换
  */
 export function useUploadBook() {
-  const { trigger, isMutating } = useSWRMutation(
-    '/api/library/upload',
-    async (url: string, { arg }: { arg: FormData }) => {
-      const res = await fetch(url, {
-        method: 'POST',
-        body: arg,
-        credentials: 'include',
-      });
-      const json = await res.json();
-      if (!res.ok || json.code >= 400) {
-        throw new Error(json.message || '上传失败');
-      }
-      return json.data as Book;
-    }
-  );
+  const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'processing'>('idle');
 
-  return { upload: trigger, isUploading: isMutating };
+  /**
+   * 直传 OSS：获取签名 URL → 浏览器直传 → 确认创建记录
+   */
+  const directUpload = useCallback(async (file: File): Promise<Book> => {
+    setIsUploading(true);
+    setProgress(0);
+    setUploadPhase('uploading');
+
+    try {
+      // 1. 获取预签名 URL
+      const presignRes = await fetch('/api/library/upload/presign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+        }),
+      });
+      const presignJson = await presignRes.json();
+      if (presignRes.status >= 400 || presignJson.code >= 400) {
+        throw new Error(presignJson.message || '获取上传签名失败');
+      }
+      const { signedUrl, objectName, fileUrl, format, contentType } = presignJson.data;
+
+      // 2. 直传 OSS（XHR 支持进度追踪）
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', signedUrl);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            // 直传模式：上传占 0-95%，确认占 95-100%
+            const pct = Math.round((e.loaded / e.total) * 95);
+            setProgress(pct);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setProgress(95);
+            setUploadPhase('processing');
+            resolve();
+          } else {
+            reject(new Error(`OSS 上传失败 (${xhr.status})`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('网络错误，请检查连接后重试'));
+        xhr.ontimeout = () => reject(new Error('上传超时，请重试'));
+        xhr.timeout = 300000;
+
+        // 设置 Content-Type 与签名一致
+        xhr.setRequestHeader('Content-Type', contentType);
+        xhr.send(file);
+      });
+
+      // 3. 确认上传，创建 Book 记录
+      const confirmRes = await fetch('/api/library/upload/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          objectName,
+          filename: file.name,
+          fileUrl,
+          format,
+          fileSize: file.size,
+        }),
+      });
+      const confirmJson = await confirmRes.json();
+      if (confirmRes.status >= 400 || confirmJson.code >= 400) {
+        throw new Error(confirmJson.message || '确认上传失败');
+      }
+
+      setProgress(100);
+      return confirmJson.data as Book;
+    } finally {
+      setIsUploading(false);
+      setUploadPhase('idle');
+      setProgress(0);
+    }
+  }, []);
+
+  /**
+   * 服务端代理上传：文件发到 Next.js 服务端，由服务端转存 OSS + 格式转换
+   */
+  const serverUpload = useCallback(async (formData: FormData): Promise<Book> => {
+    setIsUploading(true);
+    setProgress(0);
+    setUploadPhase('uploading');
+
+    return new Promise<Book>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/library/upload');
+      xhr.withCredentials = true;
+
+      // 上传进度（浏览器→服务器只占 0-70%，剩余留给服务端处理）
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 70);
+          setProgress(pct);
+          if (e.loaded >= e.total) {
+            setProgress(70);
+            setUploadPhase('processing');
+          }
+        }
+      };
+
+      xhr.onload = () => {
+        setIsUploading(false);
+        setUploadPhase('idle');
+        setProgress(0);
+
+        // 检查响应是否是 JSON
+        const ct = xhr.getResponseHeader('content-type') || '';
+        if (!ct.includes('application/json')) {
+          reject(new Error(
+            xhr.status === 413
+              ? '文件太大，超出服务器限制，请检查 nginx client_max_body_size 配置'
+              : `上传失败 (${xhr.status})：服务器返回了非预期的响应`
+          ));
+          return;
+        }
+
+        try {
+          const json = JSON.parse(xhr.responseText);
+          if (xhr.status >= 400 || json.code >= 400) {
+            reject(new Error(json.message || '上传失败'));
+          } else {
+            resolve(json.data as Book);
+          }
+        } catch {
+          reject(new Error('上传失败：服务器返回了无效的响应'));
+        }
+      };
+
+      xhr.onerror = () => {
+        setIsUploading(false);
+        setUploadPhase('idle');
+        setProgress(0);
+        reject(new Error('网络错误，请检查连接后重试'));
+      };
+
+      xhr.ontimeout = () => {
+        setIsUploading(false);
+        setUploadPhase('idle');
+        setProgress(0);
+        reject(new Error('上传超时，请重试'));
+      };
+
+      // 大文件给充足的超时时间（5 分钟）
+      xhr.timeout = 300000;
+      xhr.send(formData);
+    });
+  }, []);
+
+  /**
+   * 服务端代理上传的便捷封装（从 File 构建 FormData）
+   */
+  const serverUploadFile = useCallback(async (file: File): Promise<Book> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return serverUpload(formData);
+  }, [serverUpload]);
+
+  /**
+   * 统一入口：根据文件格式自动选择上传策略
+   * 直传失败（如 OSS 未配置 CORS）时自动回退到服务端代理
+   */
+  const upload = useCallback(async (file: File): Promise<Book> => {
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+    if (DIRECT_UPLOAD_FORMATS.has(ext)) {
+      try {
+        // 优先直传 OSS（跳过服务端中转）
+        return await directUpload(file);
+      } catch (err) {
+        // 直传失败（CORS 未配置等），自动回退到服务端代理上传
+        console.warn('直传 OSS 失败，回退到服务端代理上传:', err);
+        return serverUploadFile(file);
+      }
+    } else {
+      // 需要格式转换，走服务端代理
+      return serverUploadFile(file);
+    }
+  }, [directUpload, serverUploadFile]);
+
+  return { upload, isUploading, progress, uploadPhase };
 }
 
 /**

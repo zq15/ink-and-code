@@ -7,6 +7,9 @@ import { writeFile, readFile, unlink, mkdtemp } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
+// Route Segment Config - 增加超时和 body 大小限制
+export const maxDuration = 120; // 秒，给大文件和格式转换留足时间
+
 // 允许的电子书 MIME 类型映射
 const FORMAT_MAP: Record<string, string> = {
   'application/epub+zip': 'epub',
@@ -152,12 +155,13 @@ export async function POST(request: Request) {
       };
     }
 
-    // 创建 OSS 客户端
+    // 创建 OSS 客户端（大文件需要更长的超时时间）
     const client = new OSS({
       region: ossConfig.region,
       bucket: ossConfig.bucket,
       accessKeyId: ossConfig.accessKeyId,
       accessKeySecret: ossConfig.accessKeySecret,
+      timeout: '300s', // 5 分钟，避免大文件上传超时
     });
 
     // 生成存储路径
@@ -170,12 +174,31 @@ export async function POST(request: Request) {
     // 上传到 OSS
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const contentType = file.type || 'application/octet-stream';
 
-    const result = await client.put(objectName, buffer, {
-      headers: {
-        'Content-Type': file.type || 'application/octet-stream',
-      },
-    });
+    // 分片上传阈值：5MB 以上使用 multipartUpload 并行分片，更快
+    const MULTIPART_THRESHOLD = 5 * 1024 * 1024;
+
+    if (file.size > MULTIPART_THRESHOLD) {
+      // 大文件：写临时文件 → 分片并行上传（比单次 put 快很多）
+      const uploadTmpDir = await mkdtemp(path.join(tmpdir(), 'upload-'));
+      const tmpPath = path.join(uploadTmpDir, fileName);
+      await writeFile(tmpPath, buffer);
+      try {
+        await client.multipartUpload(objectName, tmpPath, {
+          parallel: 4,
+          partSize: 1 * 1024 * 1024, // 1MB per part
+          headers: { 'Content-Type': contentType },
+        });
+      } finally {
+        await unlink(tmpPath).catch(() => {});
+      }
+    } else {
+      // 小文件：直接上传
+      await client.put(objectName, buffer, {
+        headers: { 'Content-Type': contentType },
+      });
+    }
 
     // 构建文件 URL
     let fileUrl: string;
@@ -183,7 +206,8 @@ export async function POST(request: Request) {
       const domain = ossConfig.domain.replace(/\/$/, '');
       fileUrl = `${domain}/${objectName}`;
     } else {
-      fileUrl = result.url;
+      const region = ossConfig.region.replace(/^oss-/, '');
+      fileUrl = `https://${ossConfig.bucket}.oss-${region}.aliyuncs.com/${objectName}`;
     }
 
     // 从文件名提取标题

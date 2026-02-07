@@ -51,22 +51,37 @@ export default function LibraryPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { books, isLoading, mutate } = useBookList(search, sort);
-  const { upload, isUploading } = useUploadBook();
+  const { upload, isUploading, progress, uploadPhase } = useUploadBook();
   const { deleteBook } = useDeleteBook();
 
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    for (let i = 0; i < files.length; i++) {
-      const formData = new FormData();
-      formData.append('file', files[i]);
-      try {
-        await upload(formData);
-      } catch (err) {
-        console.error('Upload failed:', err);
-        alert(err instanceof Error ? err.message : '上传失败');
-      }
+    const fileArray = Array.from(files);
+
+    // 并发上传，限制同时 3 个
+    const concurrency = 3;
+    const errors: string[] = [];
+
+    for (let i = 0; i < fileArray.length; i += concurrency) {
+      const batch = fileArray.slice(i, i + concurrency);
+      const results = await Promise.allSettled(
+        batch.map((file) => upload(file))
+      );
+      results.forEach((r, idx) => {
+        if (r.status === 'rejected') {
+          const name = batch[idx].name;
+          const msg = r.reason instanceof Error ? r.reason.message : '上传失败';
+          errors.push(`${name}: ${msg}`);
+          console.error(`Upload failed (${name}):`, r.reason);
+        }
+      });
     }
+
+    if (errors.length > 0) {
+      alert(`以下文件上传失败：\n${errors.join('\n')}`);
+    }
+
     mutate();
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [upload, mutate]);
@@ -139,18 +154,39 @@ export default function LibraryPage() {
               multiple
               onChange={(e) => handleUpload(e.target.files)}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-primary/90 transition-all disabled:opacity-50 shadow-lg shadow-primary/20"
-            >
-              {isUploading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
+            {isUploading ? (
+              <div className="flex items-center gap-3 px-5 py-2.5 bg-card/80 border border-card-border/60 rounded-xl min-w-[220px]">
+                <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-foreground/80">
+                      {uploadPhase === 'processing' ? '服务端处理中...' : '上传中'}
+                    </span>
+                    <span className="text-[10px] font-bold text-primary tabular-nums">
+                      {progress}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-card-border/40 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ease-out ${
+                        uploadPhase === 'processing'
+                          ? 'bg-amber-500 animate-pulse'
+                          : 'bg-primary'
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+              >
                 <Upload className="w-4 h-4" />
-              )}
-              <span>{isUploading ? '上传中...' : '上传'}</span>
-            </button>
+                <span>上传</span>
+              </button>
+            )}
           </div>
         </div>
 

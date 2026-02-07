@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, ApiError } from '@/lib/api-response';
 
+// 大文件代理需要更长的超时时间
+export const maxDuration = 120; // 秒
+
 /**
  * GET /api/library/file?id=xxx
  * 代理获取书籍文件内容（避免 CORS 问题）
@@ -34,8 +37,13 @@ export async function GET(request: Request) {
     // 优先使用转换后的 URL
     const fileUrl = book.readableUrl || book.originalUrl;
 
-    // 从 OSS 获取文件
-    const response = await fetch(fileUrl);
+    // 从 OSS 获取文件（大文件设置较长的超时）
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 分钟超时
+
+    const response = await fetch(fileUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
       return ApiError.internal(`文件获取失败: ${response.status}`);
     }

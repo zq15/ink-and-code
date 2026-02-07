@@ -7,8 +7,8 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import type { ReadingSettingsData } from '@/lib/hooks/use-library';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-// 配置 PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// 配置 PDF.js worker（使用本地文件，避免 CDN 访问问题）
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 interface PdfReaderViewProps {
   url: string;
@@ -57,6 +57,12 @@ export default function PdfReaderView({
     }
   }, [initialPage]);
 
+  const onDocumentLoadError = useCallback((error: Error) => {
+    console.error('PDF Document load error:', error);
+    setLoadError(error.message || 'PDF 文档解析失败');
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
     if (numPages > 0) {
       const pct = Math.round((pageNumber / numPages) * 100);
@@ -104,6 +110,7 @@ export default function PdfReaderView({
         <Document
           file={pdfFile}
           onLoadSuccess={onDocumentLoadSuccess}
+          onLoadError={onDocumentLoadError}
           loading={null}
           className="py-4"
         >
