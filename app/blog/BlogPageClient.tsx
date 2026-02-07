@@ -50,10 +50,10 @@ interface Post {
 }
 
 interface BlogPageClientProps {
-  initialPosts: Post[];
+  initialPosts?: Post[];
 }
 
-export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
+export default function BlogPageClient({ }: BlogPageClientProps) {
   const { data: session, status } = useSession();
   const isLoggedIn = status === 'authenticated' && !!session;
   
@@ -457,53 +457,28 @@ export default function BlogPageClient({ initialPosts }: BlogPageClientProps) {
                 </div>
               </div>
 
-              {/* 移动端：显示文章列表或提示 */}
-              <div className="lg:hidden pb-8">
-                <h2 className="text-xl font-bold serif mb-4">全部文章</h2>
-                {initialPosts.length > 0 ? (
-                  <div className="space-y-3">
-                    {initialPosts.map((post) => (
-                      <button
-                        key={post.id}
-                        onClick={() => handleSelectArticle(post.id)}
-                        className="w-full text-left p-4 bg-card/50 border border-card-border/50 rounded-xl hover:border-primary/30 transition-all cursor-pointer"
-                      >
-                        <div className="flex items-start gap-3">
-                          <FileText className="w-5 h-5 text-primary/60 mt-0.5 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-foreground mb-1 line-clamp-2">{post.title}</h3>
-                            {post.excerpt && (
-                              <p className="text-sm text-muted/60 line-clamp-2 mb-2">{post.excerpt}</p>
-                            )}
-                            <div className="flex items-center gap-2 text-xs text-muted/50">
-                              <span>{new Date(post.createdAt).toLocaleDateString('zh-CN')}</span>
-                              {post.category && (
-                                <>
-                                  <span>·</span>
-                                  <span className="text-primary/70">{post.category.name}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center mx-auto border border-primary/10 mb-4">
-                      <BookOpen className="w-7 h-7 text-primary/40" />
+              {/* 移动端：显示引导页（与桌面端一致） */}
+              <div className="lg:hidden flex flex-col items-center justify-center py-20 text-center">
+                <div className="bg-card/10 border border-card-border/30 rounded-2xl p-10 w-full max-w-sm">
+                  <div className="space-y-5">
+                    <div className="w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center mx-auto border border-primary/10">
+                      <BookOpen className="w-7 h-7 text-primary opacity-30" />
                     </div>
-                    <p className="text-muted/60 mb-4">暂无文章</p>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-bold serif text-foreground/80">开始阅读</h3>
+                      <p className="text-muted/60 serif italic text-base leading-relaxed">
+                        从文章目录选择一篇文章
+                      </p>
+                    </div>
                     <button
                       onClick={() => setShowMobileSidebar(true)}
-                      className="text-sm text-primary font-medium flex items-center gap-2"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/15 transition-colors"
                     >
                       <Layout className="w-4 h-4" />
                       打开文章目录
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             </>
           )}

@@ -260,7 +260,7 @@ export default function ThemeCustomizer() {
 
       {/* 遮罩层 */}
       <div
-        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-100 transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[199] transition-opacity duration-300 ${
           isCustomizerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setCustomizerOpen(false)}
@@ -268,7 +268,7 @@ export default function ThemeCustomizer() {
 
       {/* 定制面板 */}
       <div
-        className={`fixed right-0 top-0 bottom-0 w-[340px] sm:w-[380px] bg-background border-l border-card-border z-101 transform transition-transform duration-300 ease-out overflow-y-auto scrollbar-hide ${
+        className={`fixed right-0 top-0 bottom-0 w-full sm:w-[380px] bg-background border-l border-card-border z-[200] transform transition-transform duration-300 ease-out overflow-y-auto scrollbar-hide ${
           isCustomizerOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

@@ -199,54 +199,68 @@ export default function EpubReaderView({
   }, []);
 
   // ---- 移动端：自定义触摸手势（点击翻页 + 更灵敏的滑动） ----
+  // 使用透明覆盖层拦截所有触摸事件，防止 react-pageflip 内部吞掉事件
   const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  useEffect(() => {
     if (!isMobile) return;
-    const touch = e.touches[0];
-    touchRef.current = { x: touch.clientX, y: touch.clientY, t: Date.now() };
-  }, [isMobile]);
+    const overlay = overlayRef.current;
+    if (!overlay) return;
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!isMobile || !touchRef.current) return;
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - touchRef.current.x;
-    const dy = touch.clientY - touchRef.current.y;
-    const dt = Date.now() - touchRef.current.t;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    touchRef.current = null;
+    const onTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      touchRef.current = { x: touch.clientX, y: touch.clientY, t: Date.now() };
+    };
 
-    const pageFlip = flipBookRef.current?.pageFlip();
-    if (!pageFlip) return;
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!touchRef.current) return;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchRef.current.x;
+      const dy = touch.clientY - touchRef.current.y;
+      const dt = Date.now() - touchRef.current.t;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+      touchRef.current = null;
 
-    // 滑动翻页：水平距离 > 20px 且大于垂直距离，800ms 内完成
-    if (absDx > 20 && absDx > absDy * 0.8 && dt < 800) {
-      if (dx < 0) {
-        pageFlip.flipNext();
-      } else {
-        pageFlip.flipPrev();
-      }
-      return;
-    }
+      const pageFlip = flipBookRef.current?.pageFlip();
+      if (!pageFlip) return;
 
-    // 点击翻页：移动距离 < 15px 且时间 < 400ms
-    if (absDx < 15 && absDy < 15 && dt < 400) {
-      const screenW = containerSize.w;
-      const tapX = touch.clientX;
-
-      // 左侧 35% → 上一页，右侧 35% → 下一页，中间 30% → 不翻页（留给 toolbar toggle）
-      if (tapX < screenW * 0.35) {
+      // 滑动翻页：水平距离 > 20px 且大于垂直距离，800ms 内完成
+      if (absDx > 20 && absDx > absDy * 0.8 && dt < 800) {
         e.preventDefault();
-        e.stopPropagation();
-        pageFlip.flipPrev();
-      } else if (tapX > screenW * 0.65) {
-        e.preventDefault();
-        e.stopPropagation();
-        pageFlip.flipNext();
+        if (dx < 0) {
+          pageFlip.flipNext();
+        } else {
+          pageFlip.flipPrev();
+        }
+        return;
       }
-      // 中间区域的点击由父组件的 handleToggleToolbar 处理
-    }
+
+      // 点击翻页：移动距离 < 15px 且时间 < 400ms
+      if (absDx < 15 && absDy < 15 && dt < 400) {
+        const screenW = containerSize.w;
+        const tapX = touch.clientX;
+
+        // 左侧 35% → 上一页，右侧 35% → 下一页，中间 30% → 不翻页（留给 toolbar toggle）
+        if (tapX < screenW * 0.35) {
+          e.preventDefault();
+          pageFlip.flipPrev();
+        } else if (tapX > screenW * 0.65) {
+          e.preventDefault();
+          pageFlip.flipNext();
+        }
+        // 中间区域：冒泡到父组件触发 toolbar toggle
+      }
+    };
+
+    overlay.addEventListener('touchstart', onTouchStart, { passive: true });
+    overlay.addEventListener('touchend', onTouchEnd, { passive: false });
+
+    return () => {
+      overlay.removeEventListener('touchstart', onTouchStart);
+      overlay.removeEventListener('touchend', onTouchEnd);
+    };
   }, [isMobile, containerSize.w]);
 
   // ---- 主题 ----
@@ -360,12 +374,23 @@ export default function EpubReaderView({
             opacity: showBook ? 1 : 0,
             transition: 'opacity 0.3s ease-in',
           }}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
         >
           {!isMobile && <div className="book-shadow" />}
           {!isMobile && <div className="page-stack-left" />}
           {!isMobile && <div className="page-stack-right" />}
+
+          {/* 移动端：透明触摸覆盖层，拦截所有触摸事件 */}
+          {isMobile && (
+            <div
+              ref={overlayRef}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 10,
+                touchAction: 'pan-y',
+              }}
+            />
+          )}
 
           <HTMLFlipBook
             ref={flipBookRef}
@@ -379,7 +404,7 @@ export default function EpubReaderView({
             maxHeight={900}
             showCover={false}
             mobileScrollSupport={false}
-            useMouseEvents={true}
+            useMouseEvents={!isMobile}
             usePortrait={isMobile}
             flippingTime={isMobile ? 350 : 600}
             drawShadow={!isMobile}
