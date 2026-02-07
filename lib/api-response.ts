@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 import { auth } from './auth';
 import { prisma } from './prisma';
 import crypto from 'crypto';
@@ -23,17 +24,48 @@ export async function getCurrentUserId(): Promise<string | null> {
 
 /**
  * 验证用户登录状态
+ * 优先使用 Session 认证，失败后自动回退到 Token 认证（Bearer ink_xxx）
  * 返回 { userId, error }
  */
 export async function requireAuth(): Promise<{
   userId: string | null;
   error: NextResponse | null;
 }> {
+  // 1. 优先 Session 认证
   const userId = await getCurrentUserId();
-  if (!userId) {
-    return { userId: null, error: ApiError.unauthorized('请先登录') };
+  if (userId) {
+    return { userId, error: null };
   }
-  return { userId, error: null };
+
+  // 2. 回退到 Token 认证（读取当前请求的 Authorization header）
+  try {
+    const headersList = await headers();
+    const authHeader = headersList.get('authorization');
+
+    if (authHeader && authHeader.startsWith('Bearer ink_')) {
+      const token = authHeader.slice(7);
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+      const apiToken = await prisma.apiToken.findUnique({
+        where: { token: tokenHash },
+        select: { id: true, userId: true, expiresAt: true },
+      });
+
+      if (apiToken && (!apiToken.expiresAt || apiToken.expiresAt >= new Date())) {
+        // 异步更新最后使用时间
+        prisma.apiToken.update({
+          where: { id: apiToken.id },
+          data: { lastUsedAt: new Date() },
+        }).catch(() => {});
+
+        return { userId: apiToken.userId, error: null };
+      }
+    }
+  } catch {
+    // headers() 可能在某些上下文中不可用，忽略
+  }
+
+  return { userId: null, error: ApiError.unauthorized('请先登录') };
 }
 
 /**

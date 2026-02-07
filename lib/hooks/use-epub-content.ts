@@ -162,6 +162,12 @@ export function useEpubContent(bookId: string): EpubContentResult {
         // 6. 合并所有 CSS
         const combinedCss = Array.from(cssSet).join('\n');
 
+        console.log(`[EPUB] 解析完成: ${extractedChapters.length} 章节, ${cssSet.size} 个样式表, spine: ${spineItems.length} 项`);
+
+        if (extractedChapters.length === 0) {
+          console.warn('[EPUB] 未提取到任何章节内容，spine 项:', spineItems);
+        }
+
         setChapters(extractedChapters);
         setStyles(combinedCss);
         setMetadata(bookMeta);

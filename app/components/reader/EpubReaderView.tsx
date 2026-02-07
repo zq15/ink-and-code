@@ -189,7 +189,10 @@ export default function EpubReaderView({
   const fontFamily = settings?.fontFamily ?? 'system';
 
   // ---- 是否就绪 ----
-  const ready = !isLoading && !error && pagination.isReady && containerSize.w > 0;
+  const contentParsed = !isLoading && !error;
+  const ready = contentParsed && pagination.isReady && pagination.totalPages > 0 && containerSize.w > 0;
+  // 内容解析完成但没有任何页面（可能是 EPUB 内容为空或解析失败）
+  const emptyContent = contentParsed && pagination.isReady && pagination.totalPages === 0 && chapters.length === 0;
 
   // ---- 构建页面数据 ----
   const pages = useMemo(() => {
@@ -216,8 +219,18 @@ export default function EpubReaderView({
         </div>
       )}
 
+      {/* EPUB 内容为空 */}
+      {emptyContent && (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-sm opacity-60 mb-2">EPUB 内容为空</p>
+            <p className="text-xs opacity-40">未能从该文件中提取到任何章节内容</p>
+          </div>
+        </div>
+      )}
+
       {/* 加载/排版中 */}
-      {!error && !ready && (
+      {!error && !emptyContent && !ready && (
         <div className="book-loading">
           <div className="book-loading-spinner" />
           <span className="text-xs opacity-50">
