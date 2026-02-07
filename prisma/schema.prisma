@@ -49,6 +49,13 @@ model User {
   followers     Follow[]  @relation("Following")  // 我的粉丝
   following     Follow[]  @relation("Followers")  // 我关注的人
 
+  // 阅读书架
+  books             Book[]
+  readingProgress   ReadingProgress[]
+  bookmarks         Bookmark[]
+  highlights        Highlight[]
+  readingSettings   ReadingSettings?
+
   @@map("users")
 }
 
@@ -223,4 +230,108 @@ model ApiToken {
   @@index([userId])
   @@index([token])
   @@map("api_tokens")
+}
+
+// ==========================================
+// 阅读书架模块
+// ==========================================
+
+// 书籍
+model Book {
+  id            String    @id @default(cuid())
+  title         String
+  author        String?
+  cover         String?                // 封面图 URL
+  description   String?   @db.Text
+  format        String                 // epub, pdf, txt, mobi, azw3, docx, md, html
+  originalUrl   String    @map("original_url")   // 原始文件 OSS URL
+  readableUrl   String?   @map("readable_url")   // 转换后可读文件 URL（MOBI->EPUB 等）
+  fileSize      Int       @map("file_size")      // 文件大小（字节）
+  metadata      Json?                  // 出版社、ISBN 等附加信息
+  
+  userId        String    @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  progress      ReadingProgress?
+  bookmarks     Bookmark[]
+  highlights    Highlight[]
+
+  @@index([userId])
+  @@map("books")
+}
+
+// 阅读进度
+model ReadingProgress {
+  id              String   @id @default(cuid())
+  bookId          String   @unique @map("book_id")
+  book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currentLocation String?  @map("current_location") // EPUB CFI / PDF pageNumber / 文本 scrollPercentage
+  percentage      Float    @default(0)               // 0-100
+  lastReadAt      DateTime @default(now()) @map("last_read_at")
+  totalReadTime   Int      @default(0) @map("total_read_time") // 累计阅读秒数
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, bookId])
+  @@map("reading_progress")
+}
+
+// 书签
+model Bookmark {
+  id        String   @id @default(cuid())
+  bookId    String   @map("book_id")
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title     String?
+  location  String               // 格式特定定位信息
+  note      String?  @db.Text
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, bookId])
+  @@map("bookmarks")
+}
+
+// 划线笔记
+model Highlight {
+  id        String   @id @default(cuid())
+  bookId    String   @map("book_id")
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  text      String   @db.Text         // 划线文本
+  location  String                     // 格式特定定位信息
+  color     String   @default("yellow") // yellow, green, blue, pink, purple
+  note      String?  @db.Text         // 注释
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, bookId])
+  @@map("highlights")
+}
+
+// 阅读偏好设置
+model ReadingSettings {
+  id         String   @id @default(cuid())
+  userId     String   @unique @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fontSize   Int      @default(16)  @map("font_size")
+  fontFamily String   @default("system") @map("font_family")
+  lineHeight Float    @default(1.8) @map("line_height")
+  theme      String   @default("light")  // light, dark, sepia
+  pageWidth  Int      @default(800) @map("page_width")
+  
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("reading_settings")
 }

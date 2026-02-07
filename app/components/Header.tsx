@@ -11,6 +11,7 @@ import { Github, LogIn, Menu, X } from 'lucide-react';
 const navItems = [
   { href: '/', label: '首页' },
   { href: '/blog', label: '文章' },
+  { href: '/library', label: '书架' },
   { href: '/about', label: '关于' },
 ];
 
