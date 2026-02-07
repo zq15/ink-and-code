@@ -328,13 +328,13 @@ export default function EpubReaderView({
             mobileScrollSupport={false}
             useMouseEvents={true}
             usePortrait={isMobile}
-            flippingTime={isMobile ? 500 : 600}
+            flippingTime={isMobile ? 350 : 600}
             drawShadow={!isMobile}
             maxShadowOpacity={isMobile ? 0.15 : 0.25}
             showPageCorners={!isMobile}
             disableFlipByClick={false}
             clickEventForward={true}
-            swipeDistance={isMobile ? 20 : 30}
+            swipeDistance={isMobile ? 10 : 30}
             startPage={startPage}
             startZIndex={2}
             autoSize={false}

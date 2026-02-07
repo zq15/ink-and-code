@@ -161,7 +161,7 @@ export function useBookDetail(id: string | null) {
 }
 
 // 不需要服务端转换、可直传 OSS 的格式
-const DIRECT_UPLOAD_FORMATS = new Set(['epub', 'pdf', 'txt', 'md', 'markdown', 'html', 'htm', 'mobi', 'azw', 'azw3']);
+const DIRECT_UPLOAD_FORMATS = new Set(['epub', 'pdf', 'txt', 'md', 'markdown', 'html', 'htm']);
 
 /**
  * 上传书籍（两级策略）
