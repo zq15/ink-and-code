@@ -1,0 +1,230 @@
+/* ============================================
+   Beautiful EPUB Book Reader — Book Frame Styles
+   ============================================ */
+
+/* 书本外层容器：居中 + 阴影 */
+.book-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 书本外框：包含翻页区和装饰 */
+.book-frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 书本主体阴影 */
+.book-shadow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 16px 48px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+  z-index: 0;
+}
+
+/* 左侧页边堆叠效果 */
+.page-stack-left {
+  position: absolute;
+  left: -3px;
+  top: 4px;
+  bottom: 4px;
+  width: 6px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.06),
+    rgba(0, 0, 0, 0.03) 30%,
+    rgba(0, 0, 0, 0.01) 60%,
+    transparent
+  );
+  border-radius: 2px 0 0 2px;
+}
+
+/* 右侧页边堆叠效果 */
+.page-stack-right {
+  position: absolute;
+  right: -3px;
+  top: 4px;
+  bottom: 4px;
+  width: 6px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.06),
+    rgba(0, 0, 0, 0.03) 30%,
+    rgba(0, 0, 0, 0.01) 60%,
+    transparent
+  );
+  border-radius: 0 2px 2px 0;
+}
+
+/* 书脊阴影（两页中间的分界线） */
+.book-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 30px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.03) 20%,
+    rgba(0, 0, 0, 0.08) 45%,
+    rgba(0, 0, 0, 0.12) 50%,
+    rgba(0, 0, 0, 0.08) 55%,
+    rgba(0, 0, 0, 0.03) 80%,
+    transparent 100%
+  );
+}
+
+/* 书脊高光（微妙的光泽效果） */
+.book-spine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- react-pageflip 容器样式覆盖 ---- */
+
+/* 确保翻页组件圆角 */
+.book-flipbook {
+  border-radius: 3px;
+  overflow: visible;
+}
+
+/* 页面本身的微妙效果 */
+.book-page {
+  /* 纸张纹理 — 通过极微弱的噪点渐变模拟 */
+  background-image:
+    linear-gradient(
+      135deg,
+      rgba(0, 0, 0, 0.008) 0%,
+      transparent 50%,
+      rgba(0, 0, 0, 0.005) 100%
+    );
+}
+
+/* ---- 主题变体 ---- */
+
+/* 深色主题 */
+.book-theme-dark .book-shadow {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    0 16px 48px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.book-theme-dark .book-spine {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(0, 0, 0, 0.06) 20%,
+    rgba(0, 0, 0, 0.18) 45%,
+    rgba(0, 0, 0, 0.25) 50%,
+    rgba(0, 0, 0, 0.18) 55%,
+    rgba(0, 0, 0, 0.06) 80%,
+    transparent 100%
+  );
+}
+
+.book-theme-dark .page-stack-left,
+.book-theme-dark .page-stack-right {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.05) 60%,
+    transparent
+  );
+}
+
+.book-theme-dark .page-stack-right {
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.05) 60%,
+    transparent
+  );
+}
+
+/* 羊皮纸主题 */
+.book-theme-sepia .book-shadow {
+  box-shadow:
+    0 2px 8px rgba(90, 70, 50, 0.1),
+    0 8px 24px rgba(90, 70, 50, 0.15),
+    0 16px 48px rgba(90, 70, 50, 0.1),
+    0 0 0 1px rgba(90, 70, 50, 0.08);
+}
+
+.book-theme-sepia .book-spine {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(90, 70, 50, 0.04) 20%,
+    rgba(90, 70, 50, 0.1) 45%,
+    rgba(90, 70, 50, 0.14) 50%,
+    rgba(90, 70, 50, 0.1) 55%,
+    rgba(90, 70, 50, 0.04) 80%,
+    transparent 100%
+  );
+}
+
+/* ---- 加载状态 ---- */
+.book-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+}
+
+.book-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  opacity: 0.4;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- 移动端单页模式 ---- */
+.book-spine-hidden {
+  display: none;
+}
+
+/* ---- 翻页时的附加视觉效果 ---- */
+
+/* react-pageflip 自带的阴影已经足够，这里做微调 */
+.stf__wrapper {
+  /* 让 react-pageflip 的翻页阴影更柔和 */
+  --shadow-color: rgba(0, 0, 0, 0.15);
+}

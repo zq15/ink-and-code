@@ -1,8 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
-import ePub, { type Book, type Rendition } from 'epubjs';
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  useMemo,
+} from 'react';
+import HTMLFlipBook from 'react-pageflip';
+import { useEpubContent } from '@/lib/hooks/use-epub-content';
+import {
+  useBookPagination,
+  getChapterForPage,
+} from '@/lib/hooks/use-book-pagination';
 import type { ReadingSettingsData } from '@/lib/hooks/use-library';
+import BookPage from './BookPage';
+import './epub-reader.css';
 
 interface EpubReaderViewProps {
   url: string;
@@ -20,404 +33,263 @@ export default function EpubReaderView({
   settings,
   onProgressUpdate,
 }: EpubReaderViewProps) {
+  // ---- 容器尺寸 ----
   const containerRef = useRef<HTMLDivElement>(null);
-  const curlRef = useRef<HTMLDivElement>(null);
-  const curlShadowRef = useRef<HTMLDivElement>(null);
-  const bookRef = useRef<Book | null>(null);
-  const renditionRef = useRef<Rendition | null>(null);
-  const [isReady, setIsReady] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
-  const animatingRef = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  // ---- 掀页角：更新翻卷大小 ----
-  const updateCurl = useCallback((size: number, direction: 'next' | 'prev') => {
-    const curl = curlRef.current;
-    const shadow = curlShadowRef.current;
-    if (!curl || !shadow) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      setContainerSize({ w: rect.width, h: rect.height });
+    };
 
-    const isNext = direction === 'next';
-
-    if (size <= 0) {
-      curl.style.width = '0';
-      curl.style.height = '0';
-      curl.style.opacity = '0';
-      shadow.style.width = '0';
-      shadow.style.height = '0';
-      shadow.style.opacity = '0';
-      return;
-    }
-
-    // 翻卷三角形
-    curl.style.width = `${size}px`;
-    curl.style.height = `${size}px`;
-    curl.style.opacity = '1';
-    curl.style.bottom = '0';
-    curl.style.right = isNext ? '0' : 'auto';
-    curl.style.left = isNext ? 'auto' : '0';
-
-    if (isNext) {
-      curl.style.clipPath = 'polygon(100% 0%, 0% 100%, 100% 100%)';
-      curl.style.background = [
-        'linear-gradient(315deg, transparent 44%, rgba(255,255,255,0.5) 48%, rgba(0,0,0,0.06) 52%, transparent 56%)',
-        'linear-gradient(315deg, #dedad4 0%, #eeece7 30%, #f7f5f2 55%, #fdfcfb 100%)',
-      ].join(', ');
-      curl.style.boxShadow = '-3px -3px 8px rgba(0,0,0,0.12), -1px -1px 3px rgba(0,0,0,0.06)';
-    } else {
-      curl.style.clipPath = 'polygon(0% 0%, 0% 100%, 100% 100%)';
-      curl.style.background = [
-        'linear-gradient(45deg, transparent 44%, rgba(255,255,255,0.5) 48%, rgba(0,0,0,0.06) 52%, transparent 56%)',
-        'linear-gradient(45deg, #dedad4 0%, #eeece7 30%, #f7f5f2 55%, #fdfcfb 100%)',
-      ].join(', ');
-      curl.style.boxShadow = '3px -3px 8px rgba(0,0,0,0.12), 1px -1px 3px rgba(0,0,0,0.06)';
-    }
-
-    // 底部阴影
-    const shadowSize = size * 1.15;
-    shadow.style.width = `${shadowSize}px`;
-    shadow.style.height = `${shadowSize}px`;
-    shadow.style.bottom = '0';
-    shadow.style.right = isNext ? '0' : 'auto';
-    shadow.style.left = isNext ? 'auto' : '0';
-    shadow.style.opacity = String(Math.min(0.5, size / 250));
-    shadow.style.background = isNext
-      ? 'radial-gradient(ellipse at bottom right, rgba(0,0,0,0.22) 0%, transparent 65%)'
-      : 'radial-gradient(ellipse at bottom left, rgba(0,0,0,0.22) 0%, transparent 65%)';
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  // ---- 掀角翻页动画 ----
-  const animatePageTurn = useCallback((direction: 'prev' | 'next') => {
-    const rendition = renditionRef.current;
-    if (!rendition || animatingRef.current) return;
+  // ---- EPUB 内容解析 ----
+  const { chapters, styles: epubStyles, isLoading, error } = useEpubContent(bookId);
 
-    animatingRef.current = true;
-    const curl = curlRef.current;
-    const shadow = curlShadowRef.current;
+  // ---- 响应式：判断是否为移动端（单页模式） ----
+  const isMobile = containerSize.w > 0 && containerSize.w < 768;
 
-    const rect = containerRef.current?.getBoundingClientRect();
-    const maxSize = rect ? Math.min(rect.width, rect.height) * 0.5 : 160;
-
-    // Phase 1 —— 掀角展开
-    if (curl) curl.style.transition = 'width 320ms ease-out, height 320ms ease-out, opacity 200ms ease-out';
-    if (shadow) shadow.style.transition = 'width 320ms ease-out, height 320ms ease-out, opacity 320ms ease-out';
-    updateCurl(maxSize, direction);
-
-    setTimeout(() => {
-      // 换页
-      if (direction === 'next') rendition.next();
-      else rendition.prev();
-
-      // Phase 2 —— 掀角收回
-      if (curl) curl.style.transition = 'width 250ms ease-in, height 250ms ease-in, opacity 180ms ease-in 70ms';
-      if (shadow) shadow.style.transition = 'width 250ms ease-in, height 250ms ease-in, opacity 220ms ease-in';
-      updateCurl(0, direction);
-
-      setTimeout(() => {
-        animatingRef.current = false;
-        if (curl) curl.style.transition = '';
-        if (shadow) shadow.style.transition = '';
-      }, 260);
-    }, 330);
-  }, [updateCurl]);
-
-  // 加载 EPUB
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const container = containerRef.current;
-
-    let destroyed = false;
-    let locationsTimer: ReturnType<typeof setTimeout>;
-
-    async function loadEpub() {
-      try {
-        const res = await fetch(`/api/library/file?id=${bookId}`);
-        if (!res.ok) throw new Error(`加载失败: ${res.status}`);
-        const data = await res.arrayBuffer();
-
-        if (destroyed) return;
-
-        const book = ePub(data as unknown as string);
-        bookRef.current = book;
-
-        const rendition = book.renderTo(container, {
-          width: '100%',
-          height: '100%',
-          spread: 'none',
-          flow: 'paginated',
-          allowScriptedContent: false,
-        });
-
-        renditionRef.current = rendition;
-
-        rendition.on('relocated', (location: { start: { cfi: string; percentage: number } }) => {
-          const pct = Math.round((location.start.percentage || 0) * 100);
-          onProgressUpdate?.(pct, location.start.cfi);
-        });
-
-        rendition.on('rendered', () => {
-          if (!destroyed) setIsReady(true);
-        });
-
-        if (initialLocation) {
-          rendition.display(initialLocation);
-        } else {
-          rendition.display();
-        }
-
-        // 延迟生成位置信息
-        locationsTimer = setTimeout(() => {
-          if (destroyed) return;
-          book.ready.then(() => book.locations.generate(2048)).then(() => {
-            if (destroyed) return;
-            const loc = rendition.currentLocation() as unknown as { start?: { cfi: string; percentage: number } };
-            if (loc?.start) {
-              const pct = Math.round((loc.start.percentage || 0) * 100);
-              onProgressUpdate?.(pct, loc.start.cfi);
-            }
-          });
-        }, 2000);
-
-        // 键盘翻页
-        const handleKeydown = (e: KeyboardEvent) => {
-          if (e.key === 'ArrowLeft') animatePageTurn('prev');
-          else if (e.key === 'ArrowRight') animatePageTurn('next');
-        };
-        document.addEventListener('keydown', handleKeydown);
-
-        const cleanup = () => {
-          document.removeEventListener('keydown', handleKeydown);
-        };
-        (container as HTMLDivElement & { _cleanup?: () => void })._cleanup = cleanup;
-      } catch (err) {
-        console.error('Failed to load EPUB:', err);
-        if (!destroyed) setLoadError(err instanceof Error ? err.message : '加载失败');
-      }
+  // ---- 计算单页尺寸 ----
+  const pageDimensions = useMemo(() => {
+    if (containerSize.w === 0 || containerSize.h === 0) {
+      return { pageW: 400, pageH: 560 };
     }
 
-    loadEpub();
+    const availH = containerSize.h - 32; // 上下留白
 
-    return () => {
-      destroyed = true;
-      clearTimeout(locationsTimer);
-      (container as HTMLDivElement & { _cleanup?: () => void })?._cleanup?.();
-      bookRef.current?.destroy();
-      bookRef.current = null;
-      renditionRef.current = null;
+    if (isMobile) {
+      // 移动端：单页填满宽度
+      const pageW = Math.min(containerSize.w - 24, 600);
+      const pageH = Math.min(availH, pageW * 1.45);
+      return { pageW, pageH };
+    }
+
+    // 桌面：双页展开，每页占可用宽度的一半
+    const maxBookWidth = containerSize.w - 48; // 左右留白
+    const singlePageW = Math.min(Math.floor(maxBookWidth / 2), 520);
+    const singlePageH = Math.min(availH, singlePageW * 1.4);
+
+    return {
+      pageW: singlePageW,
+      pageH: singlePageH,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookId]);
+  }, [containerSize, isMobile]);
 
-  // 监听容器尺寸变化，自动重排
+  // ---- 内容区域尺寸（去除 padding 和页码空间） ----
+  const contentWidth = Math.max(200, pageDimensions.pageW - 80); // 40px padding × 2
+  const contentHeight = Math.max(200, pageDimensions.pageH - 80 - 30); // padding + page number
+
+  // ---- 分页 ----
+  const pagination = useBookPagination(
+    chapters,
+    epubStyles,
+    settings,
+    contentWidth,
+    contentHeight,
+  );
+
+  // ---- 当前页 ----
+  // 计算初始页码（只在首次分页完成时使用）
+  const initialPage = useMemo(() => {
+    if (!initialLocation || !initialLocation.startsWith('page:')) return 0;
+    const parsed = parseInt(initialLocation.replace('page:', ''), 10);
+    return isNaN(parsed) || parsed < 0 ? 0 : parsed;
+  }, [initialLocation]);
+
+  const startPage = useMemo(() => {
+    if (!pagination.isReady) return 0;
+    return Math.min(initialPage, Math.max(0, pagination.totalPages - 1));
+  }, [pagination.isReady, pagination.totalPages, initialPage]);
+
+  const [currentPage, setCurrentPage] = useState(startPage);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const flipBookRef = useRef<any>(null);
+  const initializedRef = useRef(false);
+  const prevTotalRef = useRef(0);
+
+  // 首次分页完成后翻到保存的位置
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || !renditionRef.current) return;
+    if (!pagination.isReady) return;
 
-    let resizeTimer: ReturnType<typeof setTimeout>;
-    const ro = new ResizeObserver(() => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        const rect = container.getBoundingClientRect();
-        renditionRef.current?.resize(rect.width, rect.height);
-      }, 150);
-    });
-    ro.observe(container);
-    return () => {
-      clearTimeout(resizeTimer);
-      ro.disconnect();
-    };
-  }, [isReady]);
+    if (!initializedRef.current) {
+      // 首次初始化
+      initializedRef.current = true;
+      prevTotalRef.current = pagination.totalPages;
 
-  // 应用阅读设置
-  useEffect(() => {
-    if (!renditionRef.current || !settings) return;
-
-    const fontFamily =
-      settings.fontFamily === 'serif' ? 'Georgia, "Times New Roman", serif' :
-      settings.fontFamily === 'sans-serif' ? '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' :
-      settings.fontFamily === 'mono' ? '"SF Mono", "Fira Code", monospace' :
-      'inherit';
-
-    renditionRef.current.themes.default({
-      'body, p, div, span': {
-        'font-size': `${settings.fontSize}px !important`,
-        'line-height': `${settings.lineHeight} !important`,
-        'font-family': `${fontFamily} !important`,
-      },
-    });
-  }, [settings?.fontSize, settings?.lineHeight, settings?.fontFamily, settings]);
-
-  // ---- 触摸手势：掀角跟手 ----
-  const touchRef = useRef<{ x: number; y: number; t: number; moved: boolean } | null>(null);
-  const didPageTurnRef = useRef(false);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (animatingRef.current) return;
-    touchRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-      t: Date.now(),
-      moved: false,
-    };
-  }, []);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchRef.current || animatingRef.current) return;
-
-    const dx = e.touches[0].clientX - touchRef.current.x;
-    const dy = e.touches[0].clientY - touchRef.current.y;
-
-    if (!touchRef.current.moved && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
-      touchRef.current.moved = true;
-    }
-
-    if (touchRef.current.moved) {
-      const curl = curlRef.current;
-      const shadow = curlShadowRef.current;
-      if (!curl || !shadow) return;
-
-      // 跟手掀角：拖动距离映射到翻卷大小
-      const rect = containerRef.current?.getBoundingClientRect();
-      const maxSize = rect ? Math.min(rect.width, rect.height) * 0.5 : 160;
-      const screenWidth = window.innerWidth;
-      const ratio = Math.min(1, Math.abs(dx) / (screenWidth * 0.4));
-      const size = ratio * maxSize;
-      const isNext = dx < 0;
-
-      curl.style.transition = 'none';
-      shadow.style.transition = 'none';
-      updateCurl(size, isNext ? 'next' : 'prev');
-    }
-  }, [updateCurl]);
-
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (!touchRef.current || animatingRef.current) return;
-    const dx = e.changedTouches[0].clientX - touchRef.current.x;
-    const dt = Date.now() - touchRef.current.t;
-    const wasMoved = touchRef.current.moved;
-    touchRef.current = null;
-
-    const curl = curlRef.current;
-    const shadow = curlShadowRef.current;
-
-    // 点击翻页
-    if (!wasMoved) {
-      const tapX = e.changedTouches[0].clientX;
-      const screenWidth = window.innerWidth;
-      if (tapX < screenWidth * 0.3) {
-        didPageTurnRef.current = true;
-        animatePageTurn('prev');
-      } else if (tapX > screenWidth * 0.7) {
-        didPageTurnRef.current = true;
-        animatePageTurn('next');
-      }
-      return;
-    }
-
-    const velocity = Math.abs(dx) / Math.max(dt, 1);
-    const shouldTurn = velocity > 0.4 || Math.abs(dx) > 60;
-    const isNext = dx < 0;
-    const dir = isNext ? 'next' as const : 'prev' as const;
-
-    if (shouldTurn && Math.abs(dx) > 20) {
-      // 完成翻页：掀角展开到最大 → 换页 → 收回
-      didPageTurnRef.current = true;
-      animatingRef.current = true;
-
-      const rect = containerRef.current?.getBoundingClientRect();
-      const maxSize = rect ? Math.min(rect.width, rect.height) * 0.5 : 160;
-
-      if (curl) curl.style.transition = 'width 200ms ease-out, height 200ms ease-out';
-      if (shadow) shadow.style.transition = 'width 200ms ease-out, height 200ms ease-out, opacity 200ms ease-out';
-      updateCurl(maxSize, dir);
-
-      setTimeout(() => {
-        if (isNext) renditionRef.current?.next();
-        else renditionRef.current?.prev();
-
-        // 收回
-        if (curl) curl.style.transition = 'width 250ms ease-in, height 250ms ease-in, opacity 180ms ease-in 70ms';
-        if (shadow) shadow.style.transition = 'width 250ms ease-in, height 250ms ease-in, opacity 220ms ease-in';
-        updateCurl(0, dir);
-
+      if (startPage > 0) {
         setTimeout(() => {
-          animatingRef.current = false;
-          if (curl) curl.style.transition = '';
-          if (shadow) shadow.style.transition = '';
-        }, 260);
-      }, 210);
-    } else {
-      // 回弹：掀角不够大，弹回原位
-      if (curl) curl.style.transition = 'width 280ms cubic-bezier(0.0, 0, 0.2, 1), height 280ms cubic-bezier(0.0, 0, 0.2, 1), opacity 250ms ease-out';
-      if (shadow) shadow.style.transition = 'width 280ms cubic-bezier(0.0, 0, 0.2, 1), height 280ms cubic-bezier(0.0, 0, 0.2, 1), opacity 250ms ease-out';
-      updateCurl(0, dir);
+          flipBookRef.current?.pageFlip()?.turnToPage(startPage);
+        }, 200);
+      }
+    } else if (prevTotalRef.current > 0 && pagination.totalPages !== prevTotalRef.current) {
+      // 设置变化导致重新分页：按比例调整当前页码
+      const ratio = currentPage / Math.max(1, prevTotalRef.current - 1);
+      const newPage = Math.min(
+        Math.round(ratio * (pagination.totalPages - 1)),
+        pagination.totalPages - 1,
+      );
+      prevTotalRef.current = pagination.totalPages;
 
       setTimeout(() => {
-        if (curl) curl.style.transition = '';
-        if (shadow) shadow.style.transition = '';
-      }, 290);
+        flipBookRef.current?.pageFlip()?.turnToPage(Math.max(0, newPage));
+      }, 100);
     }
-  }, [animatePageTurn, updateCurl]);
+  }, [pagination.isReady, pagination.totalPages, startPage, currentPage]);
 
-  if (loadError) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-sm opacity-60 mb-2">EPUB 加载失败</p>
-          <p className="text-xs opacity-40">{loadError}</p>
-        </div>
-      </div>
-    );
-  }
+  // ---- 翻页事件 ----
+  const handleFlip = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (e: any) => {
+      const page = e.data as number;
+      setCurrentPage(page);
+
+      if (pagination.totalPages > 0) {
+        const pct = Math.round((page / Math.max(1, pagination.totalPages - 1)) * 100);
+        onProgressUpdate?.(pct, `page:${page}`);
+      }
+    },
+    [pagination.totalPages, onProgressUpdate],
+  );
+
+  // ---- 键盘翻页 ----
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      const pageFlip = flipBookRef.current?.pageFlip();
+      if (!pageFlip) return;
+
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        pageFlip.flipNext();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        pageFlip.flipPrev();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeydown);
+    return () => document.removeEventListener('keydown', handleKeydown);
+  }, []);
+
+  // ---- 主题 ----
+  const theme = settings?.theme || 'light';
+  const themeClass =
+    theme === 'dark' ? 'book-theme-dark' :
+    theme === 'sepia' ? 'book-theme-sepia' : '';
+
+  // ---- 排版设置 ----
+  const fontSize = settings?.fontSize ?? 16;
+  const lineHeightVal = settings?.lineHeight ?? 1.8;
+  const fontFamily = settings?.fontFamily ?? 'system';
+
+  // ---- 是否就绪 ----
+  const ready = !isLoading && !error && pagination.isReady && containerSize.w > 0;
+
+  // ---- 构建页面数据 ----
+  const pages = useMemo(() => {
+    if (!ready) return [];
+    return Array.from({ length: pagination.totalPages }, (_, i) => {
+      const info = getChapterForPage(i, pagination.chapterPageRanges);
+      return {
+        pageIndex: i,
+        chapterIndex: info?.chapterIndex ?? 0,
+        pageInChapter: info?.pageInChapter ?? 0,
+      };
+    });
+  }, [ready, pagination.totalPages, pagination.chapterPageRanges]);
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      {/* EPUB 内容 */}
-      <div ref={containerRef} className="w-full h-full" />
-
-      {/* 掀角阴影（在翻卷三角形下面） */}
-      <div
-        ref={curlShadowRef}
-        className="absolute pointer-events-none"
-        style={{ opacity: 0, zIndex: 5 }}
-      />
-
-      {/* 掀角三角形（折回的纸张） */}
-      <div
-        ref={curlRef}
-        className="absolute pointer-events-none"
-        style={{ opacity: 0, zIndex: 6 }}
-      />
-
-      {/* 透明触摸层 */}
-      {isReady && (
-        <div
-          className="absolute inset-0 z-10"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onClick={(e) => {
-            if (didPageTurnRef.current) {
-              didPageTurnRef.current = false;
-              e.stopPropagation();
-              return;
-            }
-            const clickX = e.clientX;
-            const screenWidth = window.innerWidth;
-            if (clickX < screenWidth * 0.3 || clickX > screenWidth * 0.7) {
-              e.stopPropagation();
-              animatePageTurn(clickX < screenWidth * 0.3 ? 'prev' : 'next');
-            }
-          }}
-          style={{ touchAction: 'pan-y' }}
-        />
+    <div ref={containerRef} className={`book-container ${themeClass}`}>
+      {/* 错误状态 */}
+      {error && (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="text-sm opacity-60 mb-2">EPUB 加载失败</p>
+            <p className="text-xs opacity-40">{error}</p>
+          </div>
+        </div>
       )}
 
-      {!isReady && !loadError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-inherit">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-2 border-current/10 border-t-current/60 rounded-full animate-spin" />
-            <span className="text-xs opacity-50">正在解析 EPUB...</span>
-          </div>
+      {/* 加载/排版中 */}
+      {!error && !ready && (
+        <div className="book-loading">
+          <div className="book-loading-spinner" />
+          <span className="text-xs opacity-50">
+            {isLoading ? '正在解析 EPUB...' : '正在排版...'}
+          </span>
+        </div>
+      )}
+
+      {/* 书本 */}
+      {ready && pagination.totalPages > 0 && (
+        <div className="book-frame" style={{ position: 'relative' }}>
+          {/* 书本阴影 */}
+          <div className="book-shadow" />
+
+          {/* 左侧页边堆叠 */}
+          <div className="page-stack-left" />
+
+          {/* 右侧页边堆叠 */}
+          <div className="page-stack-right" />
+
+          {/* 翻页书 */}
+          <HTMLFlipBook
+            ref={flipBookRef}
+            className="book-flipbook"
+            width={pageDimensions.pageW}
+            height={pageDimensions.pageH}
+            size="fixed"
+            minWidth={300}
+            maxWidth={600}
+            minHeight={400}
+            maxHeight={900}
+            showCover={false}
+            mobileScrollSupport={false}
+            useMouseEvents={true}
+            usePortrait={isMobile}
+            flippingTime={600}
+            drawShadow={true}
+            maxShadowOpacity={0.35}
+            showPageCorners={true}
+            disableFlipByClick={false}
+            clickEventForward={true}
+            swipeDistance={30}
+            startPage={currentPage}
+            startZIndex={2}
+            autoSize={false}
+            onFlip={handleFlip}
+            style={{}}
+          >
+            {pages.map((p) => (
+              <BookPage
+                key={p.pageIndex}
+                pageIndex={p.pageIndex}
+                currentPage={currentPage}
+                chapterHtml={chapters[p.chapterIndex]?.html || ''}
+                epubStyles={epubStyles}
+                pageInChapter={p.pageInChapter}
+                pageWidth={contentWidth}
+                pageHeight={contentHeight}
+                pageNumber={p.pageIndex + 1}
+                totalPages={pagination.totalPages}
+                fontSize={fontSize}
+                lineHeight={lineHeightVal}
+                fontFamily={fontFamily}
+                theme={theme}
+              />
+            ))}
+          </HTMLFlipBook>
+
+          {/* 书脊阴影（桌面双页模式） */}
+          {!isMobile && (
+            <div className="book-spine" />
+          )}
         </div>
       )}
     </div>
