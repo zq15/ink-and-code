@@ -158,7 +158,7 @@ export function useBookDetail(id: string | null) {
 }
 
 // 不需要服务端转换、可直传 OSS 的格式
-const DIRECT_UPLOAD_FORMATS = new Set(['epub', 'pdf', 'txt', 'md', 'markdown', 'html', 'htm']);
+const DIRECT_UPLOAD_FORMATS = new Set(['epub', 'pdf', 'txt', 'md', 'markdown', 'html', 'htm', 'mobi', 'azw', 'azw3']);
 
 /**
  * 上传书籍（两级策略）
@@ -349,17 +349,31 @@ export function useUploadBook() {
         // 优先直传 OSS（跳过服务端中转）
         return await directUpload(file);
       } catch (directErr) {
-        // 直传失败（CORS 未配置等），自动回退到服务端代理上传
-        console.warn('直传 OSS 失败，回退到服务端代理上传:', directErr);
+        const directMsg = directErr instanceof Error ? directErr.message : String(directErr);
+        console.warn('直传 OSS 失败:', directMsg, directErr);
+
+        // 如果文件较大（>10MB），不回退到服务端代理（大概率也会被 nginx 拦截）
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(
+            `直传 OSS 失败：${directMsg}\n` +
+            '请检查 OSS CORS 配置：\n' +
+            '1. 来源：填写你的网站域名（如 https://your-domain.com）\n' +
+            '2. 允许 Methods：勾选 PUT\n' +
+            '3. 允许 Headers：填写 *\n' +
+            '4. 暴露 Headers：填写 ETag'
+          );
+        }
+
+        // 小文件尝试回退到服务端代理
         try {
           return await serverUploadFile(file);
         } catch (serverErr) {
-          // 两条路径都失败，给出更有用的提示
           const msg = serverErr instanceof Error ? serverErr.message : '';
           if (msg.includes('413') || msg.includes('太大') || msg.includes('client_max_body_size')) {
             throw new Error(
-              '文件太大，服务端代理上传被 nginx 拦截。\n' +
-              '解决方案：在 OSS Bucket 中配置 CORS 规则（允许 PUT 方法），即可启用直传 OSS 绕过 nginx 限制。'
+              `直传 OSS 失败：${directMsg}\n` +
+              '服务端代理上传也被 nginx 拦截。\n' +
+              '请检查 OSS CORS 配置（允许 PUT 方法），启用直传绕过 nginx 限制。'
             );
           }
           throw serverErr;
