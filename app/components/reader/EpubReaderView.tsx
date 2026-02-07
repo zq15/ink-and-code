@@ -118,7 +118,6 @@ export default function EpubReaderView({
   const prevTotalRef = useRef(0);
   const flipTargetRef = useRef(0);
   const currentPageRef = useRef(0);
-  const isFlippingRef = useRef(false);
 
   // 首次分页完成后设置正确的起始页
   useEffect(() => {
@@ -163,10 +162,7 @@ export default function EpubReaderView({
   const handleChangeState = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (e: any) => {
-      if (e.data === 'flipping') {
-        isFlippingRef.current = true;
-      } else if (e.data === 'read') {
-        isFlippingRef.current = false;
+      if (e.data === 'read') {
         const page = flipTargetRef.current;
         currentPageRef.current = page;
         setCurrentPage(page);
@@ -198,8 +194,8 @@ export default function EpubReaderView({
   }, []);
 
   // ---- 移动端：滑动 + 点击翻页手势 ----
-  // 库自带的滑动不够灵敏，这里补充更灵敏的滑动检测和点击翻页。
-  // 通过 isFlippingRef 防止与库内部的翻页重复触发。
+  // 移动端完全禁用库的内置手势（swipeDistance=9999, disableFlipByClick, useMouseEvents=false），
+  // 所有触摸交互由此自定义 handler 全权处理，避免双重触发。
   const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -217,9 +213,6 @@ export default function EpubReaderView({
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
     touchStartRef.current = null;
-
-    // 如果库已经在处理翻页动画，不再重复触发
-    if (isFlippingRef.current) return;
 
     const pageFlip = flipBookRef.current?.pageFlip();
     if (!pageFlip) return;
@@ -374,16 +367,16 @@ export default function EpubReaderView({
             maxHeight={900}
             showCover={false}
             mobileScrollSupport={false}
-            useMouseEvents={true}
+            useMouseEvents={!isMobile}
             usePortrait={isMobile}
             singlePage={isMobile}
             flippingTime={isMobile ? 350 : 600}
             drawShadow={!isMobile}
             maxShadowOpacity={isMobile ? 0.15 : 0.25}
             showPageCorners={!isMobile}
-            disableFlipByClick={false}
-            clickEventForward={true}
-            swipeDistance={isMobile ? 5 : 30}
+            disableFlipByClick={isMobile}
+            clickEventForward={!isMobile}
+            swipeDistance={isMobile ? 9999 : 30}
             startPage={startPage}
             startZIndex={2}
             autoSize={false}
