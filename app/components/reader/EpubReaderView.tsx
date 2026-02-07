@@ -27,41 +27,43 @@ export default function EpubReaderView({
   const [isReady, setIsReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // 翻页动画锁，防止动画过程中重复触发
   const animatingRef = useRef(false);
 
-  // 带动画的翻页
+  // 3D 翻书动画
   const animatePageTurn = useCallback((direction: 'prev' | 'next') => {
     const rendition = renditionRef.current;
     const wrapper = wrapperRef.current;
     if (!rendition || !wrapper || animatingRef.current) return;
 
     animatingRef.current = true;
-    const distance = direction === 'next' ? -60 : 60;
 
-    // 滑出动画
-    wrapper.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
-    wrapper.style.transform = `translateX(${distance}px)`;
-    wrapper.style.opacity = '0.3';
+    // 翻页方向：下一页从右边掀开（像翻书），上一页从左边翻回来
+    const exitOrigin = direction === 'next' ? 'left center' : 'right center';
+    const exitRotate = direction === 'next' ? 'rotateY(-100deg)' : 'rotateY(100deg)';
+    const enterOrigin = direction === 'next' ? 'right center' : 'left center';
+    const enterRotate = direction === 'next' ? 'rotateY(70deg)' : 'rotateY(-70deg)';
+
+    // 翻出：当前页绕左/右边缘旋转离开
+    wrapper.style.transformOrigin = exitOrigin;
+    wrapper.style.transition = 'transform 350ms ease-in, opacity 300ms ease-in';
+    wrapper.style.transform = exitRotate;
+    wrapper.style.opacity = '0';
 
     setTimeout(() => {
-      // 切换页面
-      if (direction === 'next') {
-        rendition.next();
-      } else {
-        rendition.prev();
-      }
+      // 切换内容
+      if (direction === 'next') rendition.next();
+      else rendition.prev();
 
-      // 从反方向滑入
+      // 翻入：新页从反方向旋转进入
       wrapper.style.transition = 'none';
-      wrapper.style.transform = `translateX(${-distance}px)`;
-      wrapper.style.opacity = '0.3';
+      wrapper.style.transformOrigin = enterOrigin;
+      wrapper.style.transform = enterRotate;
+      wrapper.style.opacity = '0';
 
-      // 强制 reflow 使 transition 重新生效
       void wrapper.offsetHeight;
 
-      wrapper.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
-      wrapper.style.transform = 'translateX(0)';
+      wrapper.style.transition = 'transform 300ms ease-out, opacity 200ms ease-out';
+      wrapper.style.transform = 'rotateY(0deg)';
       wrapper.style.opacity = '1';
 
       setTimeout(() => {
@@ -69,8 +71,9 @@ export default function EpubReaderView({
         wrapper.style.transition = '';
         wrapper.style.transform = '';
         wrapper.style.opacity = '';
-      }, 210);
-    }, 200);
+        wrapper.style.transformOrigin = '';
+      }, 310);
+    }, 350);
   }, []);
 
   // 加载 EPUB
@@ -117,7 +120,7 @@ export default function EpubReaderView({
           rendition.display();
         }
 
-        // 延迟生成位置信息，避免阻塞 UI
+        // 延迟生成位置信息
         locationsTimer = setTimeout(() => {
           if (destroyed) return;
           book.ready.then(() => book.locations.generate(2048)).then(() => {
@@ -160,14 +163,13 @@ export default function EpubReaderView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
-  // 监听容器尺寸变化，自动重排（侧边栏开关、窗口缩放等）
+  // 监听容器尺寸变化，自动重排
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !renditionRef.current) return;
 
     let resizeTimer: ReturnType<typeof setTimeout>;
     const ro = new ResizeObserver(() => {
-      // 防抖：侧边栏动画结束后再重排，避免频繁触发
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         const rect = container.getBoundingClientRect();
@@ -200,9 +202,8 @@ export default function EpubReaderView({
     });
   }, [settings?.fontSize, settings?.lineHeight, settings?.fontFamily, settings]);
 
-  // --- 触摸手势：跟手拖拽 + 释放动画 ---
+  // --- 触摸手势：跟手 3D 翻书 ---
   const touchRef = useRef<{ x: number; y: number; t: number; moved: boolean } | null>(null);
-  const dragOffsetRef = useRef(0);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     if (animatingRef.current) return;
@@ -212,28 +213,39 @@ export default function EpubReaderView({
       t: Date.now(),
       moved: false,
     };
-    dragOffsetRef.current = 0;
   }, []);
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (!touchRef.current || animatingRef.current) return;
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
     const dx = e.touches[0].clientX - touchRef.current.x;
     const dy = e.touches[0].clientY - touchRef.current.y;
 
-    // 只有水平方向为主时才跟手
     if (!touchRef.current.moved && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
       touchRef.current.moved = true;
     }
 
-    if (touchRef.current.moved && wrapperRef.current) {
-      // 阻尼效果：拖动越远阻力越大
-      const dampened = dx * 0.4;
-      dragOffsetRef.current = dampened;
-      wrapperRef.current.style.transition = 'none';
-      wrapperRef.current.style.transform = `translateX(${dampened}px)`;
-      // 透明度跟随拖动
-      const opacity = Math.max(0.5, 1 - Math.abs(dampened) / 300);
-      wrapperRef.current.style.opacity = String(opacity);
+    if (touchRef.current.moved) {
+      // 跟手 3D 旋转：手指位移映射到 rotateY 角度
+      const screenWidth = window.innerWidth;
+      // 最大旋转 90 度，映射拖动距离
+      const angle = (dx / screenWidth) * 90;
+      const clampedAngle = Math.max(-90, Math.min(90, angle));
+
+      // 下一页：向左滑，从左边缘旋转；上一页：向右滑，从右边缘旋转
+      wrapper.style.transition = 'none';
+      if (dx < 0) {
+        // 向左滑 → 下一页预览
+        wrapper.style.transformOrigin = 'left center';
+      } else {
+        // 向右滑 → 上一页预览
+        wrapper.style.transformOrigin = 'right center';
+      }
+      wrapper.style.transform = `rotateY(${clampedAngle}deg)`;
+      const opacity = Math.max(0.3, 1 - Math.abs(clampedAngle) / 120);
+      wrapper.style.opacity = String(opacity);
     }
   }, []);
 
@@ -247,7 +259,7 @@ export default function EpubReaderView({
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
 
-    // 如果没有横向移动，检查是否是点击翻页
+    // 点击翻页
     if (!wasMoved) {
       const tapX = e.changedTouches[0].clientX;
       const screenWidth = window.innerWidth;
@@ -260,34 +272,32 @@ export default function EpubReaderView({
     }
 
     const velocity = Math.abs(dx) / Math.max(dt, 1);
-    // 快速滑动(速度>0.5) 或 拖动距离够远(>60px) 触发翻页
-    const shouldTurn = velocity > 0.5 || Math.abs(dx) > 60;
+    const shouldTurn = velocity > 0.4 || Math.abs(dx) > 60;
 
     if (shouldTurn && Math.abs(dx) > 20) {
+      // 翻页：继续旋转到底
       animatingRef.current = true;
       const direction = dx > 0 ? 'prev' : 'next';
-      const targetX = dx > 0 ? 80 : -80;
+      const exitRotate = direction === 'next' ? 'rotateY(-100deg)' : 'rotateY(100deg)';
+      const enterOrigin = direction === 'next' ? 'right center' : 'left center';
+      const enterRotate = direction === 'next' ? 'rotateY(70deg)' : 'rotateY(-70deg)';
 
-      // 滑出
-      wrapper.style.transition = 'transform 180ms ease-out, opacity 180ms ease-out';
-      wrapper.style.transform = `translateX(${targetX}px)`;
+      wrapper.style.transition = 'transform 250ms ease-in, opacity 200ms ease-in';
+      wrapper.style.transform = exitRotate;
       wrapper.style.opacity = '0';
 
       setTimeout(() => {
-        if (direction === 'next') {
-          renditionRef.current?.next();
-        } else {
-          renditionRef.current?.prev();
-        }
+        if (direction === 'next') renditionRef.current?.next();
+        else renditionRef.current?.prev();
 
-        // 从反方向滑入
         wrapper.style.transition = 'none';
-        wrapper.style.transform = `translateX(${-targetX}px)`;
+        wrapper.style.transformOrigin = enterOrigin;
+        wrapper.style.transform = enterRotate;
         wrapper.style.opacity = '0';
-        void wrapper.offsetHeight; // reflow
+        void wrapper.offsetHeight;
 
-        wrapper.style.transition = 'transform 180ms ease-out, opacity 180ms ease-out';
-        wrapper.style.transform = 'translateX(0)';
+        wrapper.style.transition = 'transform 250ms ease-out, opacity 180ms ease-out';
+        wrapper.style.transform = 'rotateY(0deg)';
         wrapper.style.opacity = '1';
 
         setTimeout(() => {
@@ -295,19 +305,21 @@ export default function EpubReaderView({
           wrapper.style.transition = '';
           wrapper.style.transform = '';
           wrapper.style.opacity = '';
-        }, 190);
-      }, 180);
+          wrapper.style.transformOrigin = '';
+        }, 260);
+      }, 250);
     } else {
-      // 回弹：没达到翻页阈值，弹回原位
-      wrapper.style.transition = 'transform 200ms ease-out, opacity 200ms ease-out';
-      wrapper.style.transform = 'translateX(0)';
+      // 回弹
+      wrapper.style.transition = 'transform 250ms ease-out, opacity 250ms ease-out';
+      wrapper.style.transform = 'rotateY(0deg)';
       wrapper.style.opacity = '1';
 
       setTimeout(() => {
         wrapper.style.transition = '';
         wrapper.style.transform = '';
         wrapper.style.opacity = '';
-      }, 210);
+        wrapper.style.transformOrigin = '';
+      }, 260);
     }
   }, [animatePageTurn]);
 
@@ -323,9 +335,13 @@ export default function EpubReaderView({
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      {/* 动画 wrapper：包裹 epub 内容，用于滑动动画 */}
-      <div ref={wrapperRef} className="w-full h-full will-change-transform">
+    <div className="relative w-full h-full overflow-hidden" style={{ perspective: '1200px' }}>
+      {/* 动画 wrapper：3D 翻书效果 */}
+      <div
+        ref={wrapperRef}
+        className="w-full h-full will-change-transform"
+        style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
+      >
         <div ref={containerRef} className="w-full h-full" />
       </div>
 
