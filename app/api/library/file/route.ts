@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth, ApiError } from '@/lib/api-response';
+import { ApiError } from '@/lib/api-response';
 
 // 大文件代理需要更长的超时时间
 export const maxDuration = 120; // 秒
@@ -8,12 +8,10 @@ export const maxDuration = 120; // 秒
 /**
  * GET /api/library/file?id=xxx
  * 代理获取书籍文件内容（避免 CORS 问题）
+ * 公开接口：所有人都可以阅读图书馆中的书籍
  */
 export async function GET(request: Request) {
   try {
-    const { userId, error: authError } = await requireAuth();
-    if (authError) return authError;
-
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -21,8 +19,8 @@ export async function GET(request: Request) {
       return ApiError.badRequest('缺少书籍 ID');
     }
 
-    const book = await prisma.book.findFirst({
-      where: { id, userId: userId! },
+    const book = await prisma.book.findUnique({
+      where: { id },
       select: {
         originalUrl: true,
         readableUrl: true,

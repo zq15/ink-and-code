@@ -1,23 +1,34 @@
 import { prisma } from '@/lib/prisma';
-import { requireAuth, success, ApiError } from '@/lib/api-response';
+import { getCurrentUserId, success, ApiError } from '@/lib/api-response';
 
 /**
  * GET /api/library/settings
  * 获取阅读偏好设置
+ * 未登录用户返回默认设置
  */
 export async function GET() {
   try {
-    const { userId, error: authError } = await requireAuth();
-    if (authError) return authError;
+    const userId = await getCurrentUserId();
+
+    // 未登录时返回默认设置
+    if (!userId) {
+      return success({
+        fontSize: 16,
+        lineHeight: 1.8,
+        fontFamily: 'system',
+        theme: 'light',
+        pageWidth: 800,
+      });
+    }
 
     let settings = await prisma.readingSettings.findUnique({
-      where: { userId: userId! },
+      where: { userId },
     });
 
     // 如果没有设置过，返回默认值
     if (!settings) {
       settings = await prisma.readingSettings.create({
-        data: { userId: userId! },
+        data: { userId },
       });
     }
 
