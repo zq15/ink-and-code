@@ -24,13 +24,13 @@ import './epub-reader.css';
  */
 const LAZY_WINDOW_DESKTOP = 6;
 /**
- * 移动端懒渲染窗口 ±4 = 覆盖 9 页。
+ * 移动端懒渲染窗口 ±5 = 覆盖 11 页。
  * 配合"防抖 + 边缘预更新"策略：
- * - 正常翻页（距中心 < 3 页）：不触发 re-render，零抖动
- * - 接近窗口边缘（距中心 ≥ 3 页）：立即更新窗口中心，防止空白
+ * - 正常翻页（距中心 < 4 页）：不触发 re-render，零抖动
+ * - 接近窗口边缘（距中心 ≥ 4 页）：推迟到下一帧更新，避免阻塞触摸事件
  * - 用户停止翻页：300ms 后防抖把窗口居中
  */
-const LAZY_WINDOW_MOBILE = 4;
+const LAZY_WINDOW_MOBILE = 5;
 
 interface EpubReaderViewProps {
   url: string;
@@ -136,6 +136,8 @@ export default function EpubReaderView({
   const currentPageRef = useRef(0);
   /** 防抖定时器：控制懒渲染窗口的更新频率 */
   const lazyUpdateTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  /** rAF 句柄：边缘检查推迟到下一帧，避免阻塞触摸事件 */
+  const edgeCheckRaf = useRef(0);
 
   // 首次分页完成后设置正确的起始页
   useEffect(() => {
@@ -214,13 +216,21 @@ export default function EpubReaderView({
 
         if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
 
-        // 边缘预更新：接近窗口边缘时立即更新，防止下一翻空白
-        setCurrentPage(prev => {
-          const lazyWindow = isMobile ? LAZY_WINDOW_MOBILE : LAZY_WINDOW_DESKTOP;
-          if (Math.abs(page - prev) >= lazyWindow - 1) {
-            return page;
-          }
-          return prev;
+        // ---- 边缘预更新：推迟到下一帧 ----
+        // 为什么不同步执行？
+        // setCurrentPage → React re-render → innerHTML 会阻塞主线程 100-300ms。
+        // 如果同步执行，阻塞期间浏览器无法处理用户的下一次触摸事件 → "断触"。
+        // 推迟到 rAF：浏览器先处理触摸事件（用户的下一次滑动被正确识别），
+        // 然后才开始重渲染。重渲染期间翻页动画在 GPU 合成层运行，不受影响。
+        if (edgeCheckRaf.current) cancelAnimationFrame(edgeCheckRaf.current);
+        edgeCheckRaf.current = requestAnimationFrame(() => {
+          setCurrentPage(prev => {
+            const lazyWindow = isMobile ? LAZY_WINDOW_MOBILE : LAZY_WINDOW_DESKTOP;
+            if (Math.abs(page - prev) >= lazyWindow - 1) {
+              return page;
+            }
+            return prev;
+          });
         });
 
         // 防抖 300ms：用户停止翻页后，一次性完成窗口居中 + 进度上报
@@ -236,10 +246,11 @@ export default function EpubReaderView({
     [pagination.totalPages, onProgressUpdate, isMobile],
   );
 
-  // 清理防抖定时器
+  // 清理定时器
   useEffect(() => {
     return () => {
       if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
+      if (edgeCheckRaf.current) cancelAnimationFrame(edgeCheckRaf.current);
     };
   }, []);
 
