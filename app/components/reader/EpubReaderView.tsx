@@ -419,7 +419,7 @@ export default function EpubReaderView({
             useMouseEvents={true}
             usePortrait={isMobile}
             singlePage={isMobile}
-            flippingTime={isMobile ? 100 : 600}
+            flippingTime={isMobile ? 300 : 600}
             drawShadow={!isMobile}
             maxShadowOpacity={isMobile ? 0.15 : 0.25}
             showPageCorners={!isMobile}
