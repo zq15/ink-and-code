@@ -359,40 +359,19 @@ export default function ReaderPage({ params }: ReaderPageProps) {
     };
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          <p className="text-sm text-muted/60 font-medium">正在加载...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!book) {
-    return (
-      <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
-        <div className="text-center">
-          <BookOpen className="w-12 h-12 text-muted/30 mx-auto mb-4" />
-          <h2 className="text-lg font-bold mb-2">书籍不存在</h2>
-          <button onClick={() => router.push('/library')} className="text-primary text-sm hover:underline">
-            返回书架
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+  // 不使用 early return：始终渲染完整页面结构 + 遮罩层。
+  // Early return 会导致 DOM 卸载/挂载产生绘制间隙（白色闪烁）。
   const readerTheme = localSettings.theme || 'light';
-  // 通过代理 API 获取文件，避免 CORS 问题
-  const proxyUrl = `/api/library/file?id=${id}`;
-  // EPUB 和 PDF 需要直接访问 OSS URL（二进制格式需要完整 URL）
-  const directUrl = book.readableUrl || book.originalUrl;
-  const format = book.readableUrl
-    ? (book.readableUrl.endsWith('.html') ? 'html' : 'epub')
-    : book.format;
-  const isUnsupportedFormat = ['mobi', 'azw3'].includes(format) && !book.readableUrl;
+  const proxyUrl = book ? `/api/library/file?id=${id}` : '';
+  const directUrl = book ? (book.readableUrl || book.originalUrl) : '';
+  const format = book
+    ? (book.readableUrl ? (book.readableUrl.endsWith('.html') ? 'html' : 'epub') : book.format)
+    : '';
+  const isUnsupportedFormat = book ? (['mobi', 'azw3'].includes(format) && !book.readableUrl) : false;
+
+  // 整体是否就绪：书籍数据加载完 + EPUB 渲染到正确位置
+  const showContent = !!book && !isLoading;
+  const showEpubOverlay = format === 'epub' && !readerReady;
 
   return (
     <div
@@ -410,19 +389,19 @@ export default function ReaderPage({ params }: ReaderPageProps) {
           : 'radial-gradient(ellipse at 50% 45%, #ece6dc 0%, #e4ddd2 65%, #dbd3c6 100%)'
       }}
     >
-      {/* 阅读区域 — 占满全屏（移动端翻页区域是整个屏幕） */}
+      {/* 阅读区域 — 占满全屏 */}
       <div className="absolute inset-0" onClick={handleToggleToolbar}>
-          {isUnsupportedFormat && (
+          {showContent && isUnsupportedFormat && (
             <div className="flex items-center justify-center h-full" onClick={(e) => e.stopPropagation()}>
               <div className="text-center max-w-sm px-4">
                 <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-30" />
                 <h3 className="text-lg font-bold mb-2">暂不支持在线阅读</h3>
                 <p className="text-sm opacity-60 mb-4">
-                  {book.format.toUpperCase()} 格式需要安装 Calibre 进行转换。
+                  {book!.format.toUpperCase()} 格式需要安装 Calibre 进行转换。
                   你可以下载原始文件在本地阅读。
                 </p>
                 <a
-                  href={book.originalUrl}
+                  href={book!.originalUrl}
                   download
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-colors"
                 >
@@ -431,11 +410,11 @@ export default function ReaderPage({ params }: ReaderPageProps) {
               </div>
             </div>
           )}
-          {format === 'epub' && dataReady && (
+          {showContent && format === 'epub' && dataReady && (
             <EpubReaderView
               url={directUrl}
               bookId={id}
-              initialLocation={book.progress?.currentLocation || undefined}
+              initialLocation={book!.progress?.currentLocation || undefined}
               settings={readerSettings}
               onProgressUpdate={handleProgressUpdate}
               onAddBookmark={handleAddBookmark}
@@ -443,20 +422,20 @@ export default function ReaderPage({ params }: ReaderPageProps) {
               onReady={handleReaderReady}
             />
           )}
-          {format === 'pdf' && (
+          {showContent && format === 'pdf' && (
             <PdfReaderView
               url={directUrl}
               bookId={id}
-              initialPage={book.progress?.currentLocation ? parseInt(book.progress.currentLocation) : undefined}
+              initialPage={book!.progress?.currentLocation ? parseInt(book!.progress.currentLocation) : undefined}
               settings={readerSettings}
               onProgressUpdate={handleProgressUpdate}
             />
           )}
-          {['txt', 'md', 'html', 'markdown'].includes(format) && (
+          {showContent && ['txt', 'md', 'html', 'markdown'].includes(format) && (
             <HtmlReaderView
               url={proxyUrl}
               format={format}
-              initialScrollPercent={book.progress?.percentage}
+              initialScrollPercent={book!.progress?.percentage}
               settings={readerSettings}
               onProgressUpdate={handleProgressUpdate}
             />
@@ -495,7 +474,7 @@ export default function ReaderPage({ params }: ReaderPageProps) {
             className="text-sm font-medium truncate max-w-[120px] sm:max-w-md opacity-80"
             style={{ fontFamily: 'Georgia, "Times New Roman", "Songti SC", serif' }}
           >
-            {book.title}
+            {book?.title}
           </span>
         </div>
 
@@ -843,43 +822,52 @@ export default function ReaderPage({ params }: ReaderPageProps) {
       </div>
 
       {/* ---- 全屏加载遮罩 ----
-        覆盖在所有内容之上，直到 EpubReaderView 发出 onReady 信号。
-        避免 SWR 验证 → 排版 → 渲染过程中暴露中间状态。
-        用户只看到一个加载画面 → 书页直接出现在正确位置。
+        始终在 DOM 中，用 opacity 控制显隐（不做条件挂载/卸载，避免绘制间隙闪烁）。
+        覆盖在所有内容之上，直到内容完全就绪。
+        - EPUB：等 EpubReaderView 发出 onReady 信号
+        - 其他格式：等 showContent
+        - 书籍不存在：显示提示
       */}
-      {format === 'epub' && !readerReady && (
-        <div
-          className="fixed inset-0 z-100 flex flex-col items-center justify-center"
-          style={{
-            background: readerTheme === 'dark'
-              ? 'rgb(26,23,20)'
-              : readerTheme === 'sepia'
-              ? 'rgb(228,216,191)'
-              : 'rgb(250,247,242)',
-          }}
-        >
-          <Loader2
-            className="w-6 h-6 animate-spin mb-3"
-            style={{
-              color: readerTheme === 'dark'
-                ? 'rgba(200,192,184,0.4)'
-                : 'rgba(80,60,30,0.25)',
-            }}
-          />
-          <span
-            className="text-xs"
-            style={{
-              fontFamily: 'Georgia, "Times New Roman", "Songti SC", serif',
-              letterSpacing: '1px',
-              color: readerTheme === 'dark'
-                ? 'rgba(200,192,184,0.4)'
-                : 'rgba(80,60,30,0.25)',
-            }}
-          >
-            {!dataReady ? '正在加载…' : '排版中…'}
-          </span>
-        </div>
-      )}
+      <div
+        className="fixed inset-0 z-100 flex flex-col items-center justify-center"
+        style={{
+          background: readerTheme === 'dark'
+            ? 'rgb(26,23,20)'
+            : readerTheme === 'sepia'
+            ? 'rgb(228,216,191)'
+            : 'rgb(250,247,242)',
+          opacity: (isLoading || !book || showEpubOverlay) ? 1 : 0,
+          pointerEvents: (isLoading || !book || showEpubOverlay) ? 'auto' : 'none',
+          transition: 'opacity 0.2s ease',
+        }}
+      >
+        {!book && !isLoading ? (
+          <div className="text-center">
+            <BookOpen className="w-12 h-12 mx-auto mb-4" style={{ opacity: 0.3, color: readerTheme === 'dark' ? '#c8c0b8' : '#3d3428' }} />
+            <h2 className="text-lg font-bold mb-2" style={{ color: readerTheme === 'dark' ? '#c8c0b8' : '#3d3428' }}>书籍不存在</h2>
+            <button onClick={() => router.push('/library')} className="text-primary text-sm hover:underline">
+              返回书架
+            </button>
+          </div>
+        ) : (
+          <>
+            <Loader2
+              className="w-6 h-6 animate-spin mb-3"
+              style={{ color: readerTheme === 'dark' ? 'rgba(200,192,184,0.4)' : 'rgba(80,60,30,0.25)' }}
+            />
+            <span
+              className="text-xs"
+              style={{
+                fontFamily: 'Georgia, "Times New Roman", "Songti SC", serif',
+                letterSpacing: '1px',
+                color: readerTheme === 'dark' ? 'rgba(200,192,184,0.4)' : 'rgba(80,60,30,0.25)',
+              }}
+            >
+              {!dataReady ? '正在加载…' : '排版中…'}
+            </span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
