@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 // ---- 类型 ----
 
@@ -298,13 +298,18 @@ export function useServerChapters(
   // ---- 构建 chaptersForPagination ----
   // 将 Map 转为与旧接口兼容的 ChapterData[] 数组
   // 未加载的章节 html 为空字符串（分页时会被估算）
-  const chaptersForPagination: ChapterData[] = chaptersMeta.map(meta => {
-    const loaded = loadedChapters.get(meta.chapterIndex);
-    return {
-      html: loaded?.html ?? '',
-      id: meta.href,
-    };
-  });
+  //
+  // 必须 useMemo：否则每次渲染都生成新数组引用 →
+  //   useBookPagination 的 paginate 回调 deps 变化 → 触发重新分页 → 无限循环
+  const chaptersForPagination = useMemo<ChapterData[]>(() => {
+    return chaptersMeta.map(meta => {
+      const loaded = loadedChapters.get(meta.chapterIndex);
+      return {
+        html: loaded?.html ?? '',
+        id: meta.href,
+      };
+    });
+  }, [chaptersMeta, loadedChapters]);
 
   return {
     chaptersMeta,

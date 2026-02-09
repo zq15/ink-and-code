@@ -316,45 +316,63 @@ export default function EpubReaderView({
     onProgressUpdateRef.current = onProgressUpdate;
   }, [onProgressUpdate]);
 
+  // 用 ref 跟踪上次的设置指纹，区分"设置变更"和"新章节加载"
+  const prevSettingsFpRef = useRef('');
+
   useEffect(() => {
     if (!pagination.isReady) return;
 
-    let settingsChanged = false;
+    const isSettingsChange = prevSettingsFpRef.current !== '' && prevSettingsFpRef.current !== settingsFingerprint;
+    prevSettingsFpRef.current = settingsFingerprint;
 
     if (!initializedRef.current) {
+      // ---- 首次初始化 ----
       initializedRef.current = true;
       prevTotalRef.current = pagination.totalPages;
       flipTargetRef.current = startPage;
       currentPageRef.current = startPage;
-    } else if (prevTotalRef.current > 0 && pagination.totalPages !== prevTotalRef.current) {
-      // 设置变化导致总页数改变 → 按比例映射到新页码
-      const ratio = currentPageRef.current / Math.max(1, prevTotalRef.current - 1);
-      const newPage = Math.min(
-        Math.round(ratio * (pagination.totalPages - 1)),
-        pagination.totalPages - 1,
-      );
+
+      pageStore.setInitialPage(currentPageRef.current);
+      pageStore.setPage(currentPageRef.current);
+
+      remountCountRef.current++;
+      setFlipBookKey(`${remountCountRef.current}_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}`);
+      setShowBook(false);
+      setPaginatedSettingsKey(settingsFingerprint);
+    } else if (isSettingsChange) {
+      // ---- 设置变更（字号/行距/字体/页面尺寸）→ 全量 remount ----
+      if (prevTotalRef.current > 0 && pagination.totalPages !== prevTotalRef.current) {
+        const ratio = currentPageRef.current / Math.max(1, prevTotalRef.current - 1);
+        const newPage = Math.min(
+          Math.round(ratio * (pagination.totalPages - 1)),
+          pagination.totalPages - 1,
+        );
+        currentPageRef.current = newPage;
+      }
       prevTotalRef.current = pagination.totalPages;
-      currentPageRef.current = newPage;
-      settingsChanged = true;
-    }
 
-    pageStore.setInitialPage(currentPageRef.current);
-    pageStore.setPage(currentPageRef.current);
+      pageStore.setInitialPage(currentPageRef.current);
+      pageStore.setPage(currentPageRef.current);
 
-    remountCountRef.current++;
-    setFlipBookKey(`${remountCountRef.current}_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}`);
-    setShowBook(false);
-    setPaginatedSettingsKey(settingsFingerprint);
+      remountCountRef.current++;
+      setFlipBookKey(`${remountCountRef.current}_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}`);
+      setShowBook(false);
+      setPaginatedSettingsKey(settingsFingerprint);
 
-    // 设置变更后，上报新页码（防抖由 reader page 的 handleProgressUpdate 负责）
-    if (settingsChanged && pagination.totalPages > 0) {
-      const page = currentPageRef.current;
-      const pct = Math.round((page / Math.max(1, pagination.totalPages - 1)) * 100);
-      const charOffset = pageToCharOffset(page);
-      onProgressUpdateRef.current?.(pct, `char:${charOffset}`, {
-        pageNumber: page,
-        settingsFingerprint,
-      });
+      // 上报新页码
+      if (pagination.totalPages > 0) {
+        const page = currentPageRef.current;
+        const pct = Math.round((page / Math.max(1, pagination.totalPages - 1)) * 100);
+        const charOffset = pageToCharOffset(page);
+        onProgressUpdateRef.current?.(pct, `char:${charOffset}`, {
+          pageNumber: page,
+          settingsFingerprint,
+        });
+      }
+    } else if (pagination.totalPages !== prevTotalRef.current) {
+      // ---- 新章节加载导致页数微调 → 静默更新，不 remount ----
+      prevTotalRef.current = pagination.totalPages;
+      // 不调用 setFlipBookKey / setShowBook，避免闪烁
     }
   }, [pagination.isReady, pagination.totalPages, startPage, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset]);
 

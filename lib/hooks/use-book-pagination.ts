@@ -245,12 +245,21 @@ export function useBookPagination(
   const rafRef = useRef(0);
   const hasInitialized = useRef(false);
 
+  // 设置指纹：仅当排版参数变化时才显示"排版中"遮罩。
+  // 新章节加载（chapters 变化）只做静默重新分页，不闪烁。
+  const settingsKey = `${styles}_${fontSize}_${lineHeight}_${fontFamilyCss}_${pageContentWidth}_${pageContentHeight}`;
+  const prevSettingsKeyRef = useRef('');
+
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
-    // 首次加载不显示遮罩；设置变化后立即标记为"重排中"
-    if (hasInitialized.current) {
+    const isSettingsChange = prevSettingsKeyRef.current !== '' && prevSettingsKeyRef.current !== settingsKey;
+    prevSettingsKeyRef.current = settingsKey;
+
+    // 仅设置变化时显示遮罩（字号/行距/字体/页面尺寸改变）
+    // 新章节加载导致的重新分页静默进行，不打断阅读体验
+    if (hasInitialized.current && isSettingsChange) {
       setResult(prev => prev.isReady ? { ...prev, isReady: false } : prev); // eslint-disable-line
     }
 
@@ -265,7 +274,7 @@ export function useBookPagination(
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [paginate]);
+  }, [paginate, settingsKey]);
 
   // 清理测量容器
   useEffect(() => {
