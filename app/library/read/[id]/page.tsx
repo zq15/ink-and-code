@@ -245,11 +245,12 @@ export default function ReaderPage({ params }: ReaderPageProps) {
   const settingsInitialized = useRef(false);
   const sliderTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // 从服务器初始化一次
+  // 从服务器初始化一次（displaySettings + readerSettings 同步更新）
   useEffect(() => {
     if (settings && !settingsInitialized.current) {
       settingsInitialized.current = true;
       setLocalSettings(settings);
+      setReaderSettings(settings);
     }
   }, [settings]);
 
@@ -258,12 +259,6 @@ export default function ReaderPage({ params }: ReaderPageProps) {
 
   // 传给 reader 的设置（按钮类立即生效，滑块类防抖后生效）
   const [readerSettings, setReaderSettings] = useState<ReadingSettingsData>(DEFAULT_SETTINGS);
-  useEffect(() => {
-    if (settings && !settingsInitialized.current) {
-      setReaderSettings(settings);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings]);
 
   // 按钮类设置（主题、字体）：立即更新 display + reader
   const handleSettingsChange = useCallback(async (key: string, value: number | string) => {

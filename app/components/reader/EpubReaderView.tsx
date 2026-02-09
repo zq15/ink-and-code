@@ -249,15 +249,20 @@ export default function EpubReaderView({
       currentPageRef.current = newPage;
     }
 
+    // 同步 store：确保 BookPage 首次渲染时 isNear 基于正确的页码计算。
+    // 必须在 setFlipBookKey 之前调用，否则 BookPages 会以 pageStore=0 渲染，
+    // 当 startPage > LAZY_WINDOW 时，目标页的 isNear=false → 内容为空白。
+    pageStore.setPage(currentPageRef.current);
+
     // 递增计数器，确保即使排版结果完全相同（如设置 A→B→A），key 也会变化触发 remount
     remountCountRef.current++;
 
     // 同一个批次：flipBookKey + showBook(false) + settingsKey
     // React 将这三个 setState 合并为一次 re-render，遮罩不会中间消失
-    setFlipBookKey(`${remountCountRef.current}_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}`); // eslint-disable-line
-    setShowBook(false); // eslint-disable-line
+    setFlipBookKey(`${remountCountRef.current}_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}`);
+    setShowBook(false);
     setPaginatedSettingsKey(`${fontSize}_${lineHeightVal}_${fontFamily}_${pageDimensions.pageW}_${pageDimensions.pageH}`);
-  }, [pagination.isReady, pagination.totalPages, startPage, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily]);
+  }, [pagination.isReady, pagination.totalPages, startPage, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore]);
 
   // flipBookKey 变化 → HTMLFlipBook 已 remount → 等待渲染完成 → 跳转页码 → 淡入
   useEffect(() => {
