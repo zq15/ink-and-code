@@ -31,12 +31,22 @@ interface ReaderPageProps {
 export default function ReaderPage({ params }: ReaderPageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const { book, isLoading } = useBookDetail(id);
+  const { book, isLoading, isValidating } = useBookDetail(id);
   const { settings, mutate: mutateSettings } = useReadingSettings();
   const { saveSettings } = useSaveReadingSettings();
   const { saveProgress } = useSaveProgress();
   const { bookmarks, addBookmark, deleteBookmark, mutate: mutateBookmarks } = useBookmarks(id);
   const { highlights, addHighlight, deleteHighlight, mutate: mutateHighlights } = useHighlights(id);
+
+  // ---- 首次加载保护 ----
+  // SWR 可能先返回缓存的旧进度（stale），再验证得到最新进度。
+  // 如果用旧进度初始化阅读器，会看到先跳到旧页码再跳到新页码。
+  // 解决：首次打开时，等 SWR 验证完成（isValidating=false）后再渲染阅读器。
+  const initialLoadDoneRef = useRef(false);
+  if (!isValidating && book) {
+    initialLoadDoneRef.current = true;
+  }
+  const dataReady = initialLoadDoneRef.current && !!book;
 
   const [showToolbar, setShowToolbar] = useState(true);
   const [showSidebar, setShowSidebar] = useState<'toc' | 'bookmarks' | 'highlights' | 'settings' | null>(null);
@@ -346,7 +356,7 @@ export default function ReaderPage({ params }: ReaderPageProps) {
     };
   }, []);
 
-  if (isLoading) {
+  if (isLoading || !dataReady) {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="flex flex-col items-center gap-4">

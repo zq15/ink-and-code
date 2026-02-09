@@ -152,12 +152,12 @@ export function useBookList(search?: string, sort?: string) {
  * 获取书籍详情
  */
 export function useBookDetail(id: string | null) {
-  const { data, error, isLoading, mutate } = useSWR<BookDetail>(
+  const { data, error, isLoading, isValidating, mutate } = useSWR<BookDetail>(
     id ? `/api/library/detail?id=${id}` : null,
     fetcher
   );
 
-  return { book: data, isLoading, error, mutate };
+  return { book: data, isLoading, isValidating, error, mutate };
 }
 
 // 不需要服务端转换、可直传 OSS 的格式
