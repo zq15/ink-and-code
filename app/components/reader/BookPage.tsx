@@ -156,8 +156,35 @@ const BookPage = React.forwardRef<HTMLDivElement, BookPageProps>(
               left: padding,
               width: pageWidth,
               height: pageHeight,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-          />
+          >
+            {/* 章节未加载或不在懒渲染窗口内时显示加载提示 */}
+            {chapterHtml === '' && (
+              <div style={{ textAlign: 'center', opacity: 0.25 }}>
+                <div
+                  style={{
+                    width: 20, height: 20,
+                    border: `2px solid ${themeColors.pageNumColor}`,
+                    borderTopColor: 'transparent',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                    margin: '0 auto 8px',
+                  }}
+                />
+                <span style={{
+                  fontSize: '11px',
+                  fontFamily: 'Georgia, "Times New Roman", serif',
+                  color: themeColors.pageNumColor,
+                  letterSpacing: '0.5px',
+                }}>
+                  加载中…
+                </span>
+              </div>
+            )}
+          </div>
         )}
 
         {/* 页码 — 优雅的衬线体排版 */}

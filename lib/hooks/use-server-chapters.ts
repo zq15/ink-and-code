@@ -47,18 +47,20 @@ export interface ServerChaptersResult {
   updateCurrentChapter: (chapterIndex: number) => void;
   /** 某个章节是否已加载 */
   isChapterLoaded: (chapterIndex: number) => boolean;
+  /** 确保指定范围的章节已加载（兜底：翻到未加载区域时调用） */
+  ensureChaptersLoaded: (from: number, to: number) => void;
 }
 
 // ---- 配置常量 ----
 
 /** 初始加载窗口：当前章节前后各加载多少章 */
-const CHAPTER_WINDOW = 5;
+const CHAPTER_WINDOW = 8;
 /** 预取阈值：距离已加载边界还剩几章时开始预取 */
-const PREFETCH_THRESHOLD = 2;
+const PREFETCH_THRESHOLD = 4;
 /** 每次预取多少章 */
-const PREFETCH_BATCH = 5;
+const PREFETCH_BATCH = 8;
 /** 最大缓存章节数（超出时从远端移除） */
-const MAX_CACHE = 20;
+const MAX_CACHE = 40;
 
 /**
  * 服务端章节加载 Hook
@@ -324,6 +326,12 @@ export function useServerChapters(
     });
   }, [chaptersMeta, loadedChapters]);
 
+  // ---- 兜底加载：确保指定范围的章节已加载 ----
+  // 当用户快速翻页超过预取范围时，由 EpubReaderView 调用
+  const ensureChaptersLoaded = useCallback((from: number, to: number) => {
+    fetchChapters(from, to);
+  }, [fetchChapters]);
+
   return {
     chaptersMeta,
     loadedChapters,
@@ -334,5 +342,6 @@ export function useServerChapters(
     error,
     updateCurrentChapter,
     isChapterLoaded,
+    ensureChaptersLoaded,
   };
 }
