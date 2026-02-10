@@ -335,6 +335,13 @@ export default function EpubReaderView({
     const isProgressRestore = initializedRef.current &&
       initialLocation !== prevInitialLocationRef.current &&
       startPage > 0;
+    // 首次初始化时 startPage 可能为 0（chapterPageRanges 尚未就绪），等分页完成后 startPage 会变成正确值，
+    // 此时需跳到该页，否则会一直停在第一页。
+    const isLateProgressApply =
+      initializedRef.current &&
+      startPage > 0 &&
+      currentPageRef.current === 0 &&
+      savedCharOffset > 0;
 
     prevSettingsFpRef.current = settingsFingerprint;
 
@@ -347,6 +354,8 @@ export default function EpubReaderView({
       flipTargetRef.current = startPage;
 
       const win = calcPageWindow(startPage, pagination.totalPages, pageWindowSize);
+      // 首次渲染需同步设置窗口与页码，否则 FlipBook 会以错误 startPage 挂载
+      /* eslint-disable-next-line react-hooks/set-state-in-effect */
       setWindowStart(win.start);
       setCurrentLocalPage(startPage - win.start);
       pageStore.setInitialPage(startPage);
@@ -374,25 +383,26 @@ export default function EpubReaderView({
         const charOffset = pageToCharOffset(globalPage);
         onProgressUpdateRef.current?.(pct, `char:${charOffset}`, { pageNumber: globalPage, settingsFingerprint });
       }
-    } else if (isProgressRestore) {
-      // ---- SWR 重新验证带来新进度 → 更新窗口 + 本地页码，无 key 变化 ----
-      // 如果窗口位置变了 → children 变化 → 库的 updateFromHtml 原地跳转
-      // 如果窗口位置没变 → startPage 变化 → 库的 startPage 响应式 turnToPage
-      prevInitialLocationRef.current = initialLocation;
+    } else if (isProgressRestore || isLateProgressApply) {
+      // ---- 进度恢复：SWR 新进度 或 分页就绪后补跳（之前 startPage 曾为 0） ----
+      // 更新窗口 + 本地页码；库通过 updateFromHtml(..., startPage) 或 startPage 响应式跳转
+      if (isProgressRestore) prevInitialLocationRef.current = initialLocation;
       prevTotalRef.current = pagination.totalPages;
       currentPageRef.current = startPage;
       flipTargetRef.current = startPage;
 
       const win = calcPageWindow(startPage, pagination.totalPages, pageWindowSize);
-      setWindowStart(win.start);
-      setCurrentLocalPage(startPage - win.start);
       pageStore.setInitialPage(startPage);
       pageStore.setPage(startPage);
+      queueMicrotask(() => {
+        setWindowStart(win.start);
+        setCurrentLocalPage(startPage - win.start);
+      });
     } else if (pagination.totalPages !== prevTotalRef.current) {
       // ---- 新章节加载导致页数微调 → 静默更新 ----
       prevTotalRef.current = pagination.totalPages;
     }
-  }, [pagination.isReady, isLoading, pagination.totalPages, startPage, initialLocation, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset, pageWindowSize]);
+  }, [pagination.isReady, isLoading, pagination.totalPages, startPage, savedCharOffset, initialLocation, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset, pageWindowSize]);
 
   // ---- FlipBook 挂载后淡入 ----
   useEffect(() => {
