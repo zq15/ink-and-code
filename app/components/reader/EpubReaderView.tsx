@@ -1,3 +1,12 @@
+/*
+ * :file description: 
+ * :name: /ink-and-code/app/components/reader/EpubReaderView.tsx
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ * :date created: 2026-02-07 11:33:11
+ * :last editor: PTC
+ * :date last edited: 2026-02-10 16:53:28
+ */
 'use client';
 
 import {
@@ -20,10 +29,11 @@ import './epub-reader.css';
 
 // ---- 页面级滑动窗口配置 ----
 // 只给 HTMLFlipBook 传 windowSize 个页面，而非全部。
-// 接近边界时移窗重建，DOM 节点数从 N 降到 ~windowSize。
-const PAGE_WINDOW_DESKTOP = 60;   // 桌面端窗口页数
-const PAGE_WINDOW_MOBILE = 30;    // 移动端窗口页数
-const SHIFT_THRESHOLD = 6;        // 距离窗口边界多少页时触发移窗
+// 库的 updateFromHtml 支持原地替换，窗口滑动零闪烁，因此窗口无需过大。
+// 60 页 ≈ 用户翻 30 次才可能触发一次窗口滑动，体验足够流畅。
+const PAGE_WINDOW_SIZE_DESKTOP = 60;
+const PAGE_WINDOW_SIZE_MOBILE = 40;
+const SHIFT_THRESHOLD = 10;
 
 // ---- 页面状态外部存储 ----
 export interface PageStoreType {
@@ -145,6 +155,7 @@ export default function EpubReaderView({
     styles: epubStyles,
     totalCharacters,
     isLoading,
+    isFetchingChapters,
     error,
     updateCurrentChapter,
     isChapterLoaded,
@@ -153,7 +164,6 @@ export default function EpubReaderView({
 
   // ---- 响应式 ----
   const isMobile = containerSize.w > 0 && containerSize.w < 768;
-  const pageWindowSize = isMobile ? PAGE_WINDOW_MOBILE : PAGE_WINDOW_DESKTOP;
 
   // ---- 计算单页尺寸 ----
   const settingsPageWidth = settings?.pageWidth ?? 800;
@@ -176,7 +186,19 @@ export default function EpubReaderView({
   // ---- 分页 ----
   const pagination = useBookPagination(chapters, chaptersMeta, epubStyles, settings, contentWidth, contentHeight);
 
-  // ---- 章节字符偏移表（基于服务端元数据）----
+  // ---- 窗口大小 ----
+  // 固定窗口：库的 updateFromHtml 已支持原地替换，窗口滑动无闪烁，
+  // 不再需要"小书全量覆盖"的策略，统一用固定小窗口减少 DOM 数量。
+  const pageWindowSize = useMemo(() => {
+    const winSize = isMobile ? PAGE_WINDOW_SIZE_MOBILE : PAGE_WINDOW_SIZE_DESKTOP;
+    // 总页数比窗口还小时，直接用总页数
+    if (pagination.totalPages > 0 && pagination.totalPages <= winSize) {
+      return pagination.totalPages;
+    }
+    return winSize;
+  }, [isMobile, pagination.totalPages]);
+
+  // ---- 章节字符偏移表 ----
   const { chapterTextLengths, chapterCumOffsets, totalTextLength } = useMemo(() => {
     if (chaptersMeta.length === 0) return { chapterTextLengths: [], chapterCumOffsets: [0], totalTextLength: totalCharacters };
     const lengths: number[] = [];
@@ -257,92 +279,43 @@ export default function EpubReaderView({
     pageStore.setLazyWindow(Math.floor(pageWindowSize / 2));
   }, [pageWindowSize, pageStore]);
 
+  // ==================================================================
+  //  核心状态（简化后）
+  //  - settingsKey:      仅在设置变更 / 首次初始化时改变 → 触发 FlipBook 硬重建
+  //  - windowStart:      滑动窗口起始全局页码
+  //  - currentLocalPage: 当前用户在窗口内的本地页码，同步给 FlipBook 的 startPage
+  //                      窗口滑动时：children 变化 → 库内部 updateFromHtml(items, startPage) 原地替换
+  //                      不需要改 key，不需要 DOM 快照，零闪烁
+  // ==================================================================
   const [showBook, setShowBook] = useState(false);
-  const [flipBookKey, setFlipBookKey] = useState('');
-  const [paginatedSettingsKey, setPaginatedSettingsKey] = useState('');
-  const [flipStartPage, setFlipStartPage] = useState(0);  // FlipBook 的目标起始页
+  const [settingsKey, setSettingsKey] = useState('');
+  const [windowStart, setWindowStart] = useState(0);
+  const [currentLocalPage, setCurrentLocalPage] = useState(0);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const flipBookRef = useRef<any>(null);
   const initializedRef = useRef(false);
   const prevTotalRef = useRef(0);
   const flipTargetRef = useRef(0);
-  const currentPageRef = useRef(0);            // 全局页码
+  const currentPageRef = useRef(0);
   const lazyUpdateTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const remountCountRef = useRef(0);
-  const softRemountRef = useRef(false);        // 标记本次 remount 是否为无痛（soft）模式
-  const bookFrameRef = useRef<HTMLDivElement>(null);   // book-frame DOM 引用
-  const snapshotElRef = useRef<HTMLDivElement | null>(null); // soft remount 时的 DOM 快照覆盖层
-
-  // ---- 页面级滑动窗口 ----
-  // windowStart: 当前窗口的全局起始页码（state，参与渲染）
-  // 只传窗口内的页面给 HTMLFlipBook，大幅减少 DOM 节点数
-  const [windowStart, setWindowStart] = useState(0);
+  // 待执行的窗口滑动（等翻页动画结束后再执行，避免打断动画造成卡顿）
+  const pendingWindowShift = useRef<(() => void) | null>(null);
 
   const onProgressUpdateRef = useRef(onProgressUpdate);
   useEffect(() => { onProgressUpdateRef.current = onProgressUpdate; }, [onProgressUpdate]);
+  const onReadyRef = useRef(onReady);
+  useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
   const prevSettingsFpRef = useRef('');
   const prevInitialLocationRef = useRef<string | undefined>(undefined);
 
-  /** 移除 DOM 快照覆盖层 */
-  const removeSnapshot = useCallback(() => {
-    if (snapshotElRef.current) {
-      snapshotElRef.current.remove();
-      snapshotElRef.current = null;
-    }
-  }, []);
-
-  /**
-   * 触发 FlipBook remount：设置窗口 + key
-   * @param globalPage 目标全局页码
-   * @param soft 无痛模式：不隐藏书页、不显示 loading 遮罩（用于窗口滑动、章节预取等场景）
-   */
-  const doRemount = useCallback((globalPage: number, soft = false) => {
-    softRemountRef.current = soft;
-
-    // ---- Soft 模式：克隆当前书页 DOM 作为过渡快照 ----
-    // 原理：React 改变 key 时会先销毁旧 FlipBook 再挂载新 FlipBook，
-    // 中间 1-2 帧内书页区域为空，产生肉眼可见的闪白。
-    // 解决：在 remount 前深拷贝当前 book-frame 的 DOM，绝对定位覆盖在原位，
-    // 作为"定格画面"填补过渡间隙。新 FlipBook 就绪后再移除快照。
-    if (soft && bookFrameRef.current) {
-      removeSnapshot(); // 清除可能残留的旧快照
-      const clone = bookFrameRef.current.cloneNode(true) as HTMLDivElement;
-      clone.style.position = 'absolute';
-      clone.style.inset = '0';
-      clone.style.zIndex = '25';            // 高于 FlipBook，低于 loading 遮罩(30)
-      clone.style.pointerEvents = 'none';   // 不拦截事件
-      clone.removeAttribute('data-snapshot'); // 防止选择器误选
-      clone.setAttribute('data-snapshot', 'true');
-      bookFrameRef.current.parentElement?.appendChild(clone);
-      snapshotElRef.current = clone;
-    }
-
-    const win = calcPageWindow(globalPage, pagination.totalPages, pageWindowSize);
-    setWindowStart(win.start);
-    setFlipStartPage(globalPage);
-
-    pageStore.setInitialPage(globalPage);
-    pageStore.setPage(globalPage);
-
-    remountCountRef.current++;
-    setFlipBookKey(`${remountCountRef.current}_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}_${win.start}`);
-    // soft 模式下保持书页可见，用户无感知
-    if (!soft) setShowBook(false);
-    setPaginatedSettingsKey(settingsFingerprint);
-  }, [pagination.totalPages, pageWindowSize, pageDimensions.pageW, pageDimensions.pageH, settingsFingerprint, pageStore, removeSnapshot]);
-
+  // ---- 主初始化 & 变更响应 ----
   useEffect(() => {
-    // 等待分页就绪；首次初始化还需等待章节加载完成，
-    // 避免在仅有估算分页时 doRemount 导致页码闪烁。
-    // 设置变更（isSettingsChange）不受 isLoading 阻塞，因为它不影响 startPage 准确性。
     if (!pagination.isReady) return;
     if (!initializedRef.current && isLoading) return;
 
     const isSettingsChange = prevSettingsFpRef.current !== '' && prevSettingsFpRef.current !== settingsFingerprint;
-    // 仅当 initialLocation prop 实际变化时才视为进度恢复（如 SWR 重新验证从其他设备带来新进度）。
-    // 不再跟踪 startPage 变化——新章节加载导致的分页微调会改变 startPage，
-    // 但用户当前阅读位置未变，不应触发 remount。
     const isProgressRestore = initializedRef.current &&
       initialLocation !== prevInitialLocationRef.current &&
       startPage > 0;
@@ -354,67 +327,70 @@ export default function EpubReaderView({
       initializedRef.current = true;
       prevInitialLocationRef.current = initialLocation;
       prevTotalRef.current = pagination.totalPages;
-      flipTargetRef.current = startPage;
       currentPageRef.current = startPage;
-      doRemount(startPage); // eslint-disable-line
+      flipTargetRef.current = startPage;
+
+      const win = calcPageWindow(startPage, pagination.totalPages, pageWindowSize);
+      setWindowStart(win.start);
+      setCurrentLocalPage(startPage - win.start);
+      pageStore.setInitialPage(startPage);
+      pageStore.setPage(startPage);
+      setSettingsKey(`init_${pagination.totalPages}_${pageDimensions.pageW}_${pageDimensions.pageH}`);
     } else if (isSettingsChange) {
-      // ---- 设置变更 → 全量 remount（hard，显示 loading） ----
+      // ---- 设置变更 → 硬重建（改 key，显示 loading） ----
       if (prevTotalRef.current > 0 && pagination.totalPages !== prevTotalRef.current) {
         const ratio = currentPageRef.current / Math.max(1, prevTotalRef.current - 1);
         currentPageRef.current = Math.min(Math.round(ratio * (pagination.totalPages - 1)), pagination.totalPages - 1);
       }
       prevTotalRef.current = pagination.totalPages;
-      doRemount(currentPageRef.current);
+
+      const globalPage = currentPageRef.current;
+      const win = calcPageWindow(globalPage, pagination.totalPages, pageWindowSize);
+      setWindowStart(win.start);
+      setCurrentLocalPage(globalPage - win.start);
+      pageStore.setInitialPage(globalPage);
+      pageStore.setPage(globalPage);
+      setSettingsKey(`settings_${settingsFingerprint}`);
+      setShowBook(false);
 
       if (pagination.totalPages > 0) {
-        const page = currentPageRef.current;
-        const pct = Math.round((page / Math.max(1, pagination.totalPages - 1)) * 100);
-        const charOffset = pageToCharOffset(page);
-        onProgressUpdateRef.current?.(pct, `char:${charOffset}`, { pageNumber: page, settingsFingerprint });
+        const pct = Math.round((globalPage / Math.max(1, pagination.totalPages - 1)) * 100);
+        const charOffset = pageToCharOffset(globalPage);
+        onProgressUpdateRef.current?.(pct, `char:${charOffset}`, { pageNumber: globalPage, settingsFingerprint });
       }
     } else if (isProgressRestore) {
-      // ---- SWR 重新验证带来新进度 → soft remount，用户无感知跳转 ----
+      // ---- SWR 重新验证带来新进度 → 更新窗口 + 本地页码，无 key 变化 ----
+      // 如果窗口位置变了 → children 变化 → 库的 updateFromHtml 原地跳转
+      // 如果窗口位置没变 → startPage 变化 → 库的 startPage 响应式 turnToPage
       prevInitialLocationRef.current = initialLocation;
       prevTotalRef.current = pagination.totalPages;
       currentPageRef.current = startPage;
       flipTargetRef.current = startPage;
-      doRemount(startPage, true);
+
+      const win = calcPageWindow(startPage, pagination.totalPages, pageWindowSize);
+      setWindowStart(win.start);
+      setCurrentLocalPage(startPage - win.start);
+      pageStore.setInitialPage(startPage);
+      pageStore.setPage(startPage);
     } else if (pagination.totalPages !== prevTotalRef.current) {
-      // ---- 新章节加载导致页数微调 → 静默更新，无任何 remount ----
+      // ---- 新章节加载导致页数微调 → 静默更新 ----
       prevTotalRef.current = pagination.totalPages;
     }
-  }, [pagination.isReady, isLoading, pagination.totalPages, startPage, initialLocation, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset, doRemount]);
+  }, [pagination.isReady, isLoading, pagination.totalPages, startPage, initialLocation, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset, pageWindowSize]);
 
-  // FlipBook remount 后 → 跳转到正确页码 → 淡入
-  const windowStartForEffect = windowStart;
-  const onReadyRef = useRef(onReady);
-  useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
-
+  // ---- FlipBook 挂载后淡入 ----
   useEffect(() => {
-    if (!flipBookKey) return;
-    const isSoft = softRemountRef.current;
-    // soft 模式（窗口滑动等）：50ms 等 FlipBook 挂载并渲染首帧
-    // hard 模式（首次加载、设置变更）：300ms 确保排版完成再淡入
-    const delay = isSoft ? 50 : 300;
+    if (!settingsKey) return;
     const timer = setTimeout(() => {
-      const globalPage = currentPageRef.current;
-      const localPage = globalPage - windowStartForEffect;
-      if (localPage > 0) {
-        flipBookRef.current?.pageFlip()?.turnToPage(localPage);
-      }
-      pageStore.setPage(globalPage);
-      // 移除 DOM 快照覆盖层（如有），露出已就绪的新 FlipBook
-      removeSnapshot();
-      if (!isSoft) {
-        setShowBook(true);
-        // 通知父组件：书页已就绪，可以隐藏全局 loading
-        onReadyRef.current?.();
-      }
-    }, delay);
+      setShowBook(true);
+      onReadyRef.current?.();
+    }, 300);
     return () => clearTimeout(timer);
-  }, [flipBookKey, pageStore, windowStartForEffect, removeSnapshot]);
+  }, [settingsKey]);
 
   // ---- 翻页事件 ----
+  // 新库内部已做 ref-bridge：注册一次 handler，始终调最新的 props.onFlip。
+  // 不再需要 EpubReaderView 层的 handleFlipRef / handleChangeStateRef 桥接。
   const handleFlip = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (e: any) => {
@@ -425,14 +401,14 @@ export default function EpubReaderView({
 
       if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
       pageStore.setPage(globalPage);
+      // 同步 startPage 给库：确保后续 updateFromHtml（章节加载触发）
+      // 能定位到用户当前页面，而非跳回旧位置。
+      setCurrentLocalPage(localPage);
 
       // 章节预取
       const info = getChapterForPage(globalPage, pagination.chapterPageRanges);
       if (info) {
         updateCurrentChapter(info.chapterIndex);
-
-        // 兜底：如果当前翻到的章节还没加载，立即触发加载
-        // 这发生在用户快速翻页超过预取速度时
         if (!isChapterLoaded(info.chapterIndex)) {
           const from = Math.max(0, info.chapterIndex - 2);
           const to = Math.min(chaptersMeta.length - 1, info.chapterIndex + 2);
@@ -440,20 +416,26 @@ export default function EpubReaderView({
         }
       }
 
-      // 检查是否需要移窗
-      const winStart = windowStart;
-      const winEnd = winStart + pageWindowSize;
-      const nearStart = localPage < SHIFT_THRESHOLD && winStart > 0;
-      const nearEnd = localPage > (winEnd - winStart) - SHIFT_THRESHOLD && winEnd < pagination.totalPages;
+      // ---- 窗口滑动检测（类虚拟列表策略） ----
+      // 接近窗口边界时，不立即移窗（会打断翻页动画 → 卡顿），
+      // 而是记录"待移窗"，等 handleChangeState 收到 state === 'read'
+      //（动画结束、书页静止）时再执行。
+      // 这样窗口滑动永远发生在"空闲帧"，不打断任何动画，零卡顿。
+      const winEnd = windowStart + pageWindowSize;
+      const nearStart = localPage < SHIFT_THRESHOLD && windowStart > 0;
+      const nearEnd = localPage > (winEnd - windowStart) - SHIFT_THRESHOLD && winEnd < pagination.totalPages;
 
       if (nearStart || nearEnd) {
-        // 延迟移窗，等翻页动画完成；soft 模式下不显示 loading
-        setTimeout(() => {
-          doRemount(currentPageRef.current, true);
-        }, 400);
+        pendingWindowShift.current = () => {
+          const gp = currentPageRef.current;
+          const newWin = calcPageWindow(gp, pagination.totalPages, pageWindowSize);
+          setWindowStart(newWin.start);
+          setCurrentLocalPage(gp - newWin.start);
+          pageStore.setInitialPage(gp);
+        };
       }
     },
-    [pageStore, pagination.chapterPageRanges, pagination.totalPages, updateCurrentChapter, isChapterLoaded, ensureChaptersLoaded, chaptersMeta.length, pageWindowSize, doRemount, windowStart],
+    [pageStore, pagination.chapterPageRanges, pagination.totalPages, updateCurrentChapter, isChapterLoaded, ensureChaptersLoaded, chaptersMeta.length, pageWindowSize, windowStart],
   );
 
   const handleChangeState = useCallback(
@@ -462,6 +444,17 @@ export default function EpubReaderView({
       if (e.data === 'read') {
         const globalPage = flipTargetRef.current;
         currentPageRef.current = globalPage;
+
+        // ---- 执行待定的窗口滑动 ----
+        // 此刻翻页动画刚结束，书页静止，是最佳移窗时机。
+        // updateFromHtml 的 finishAnimation() 此时是空操作（没有动画在跑），
+        // 页面替换在同一帧内同步完成 → 用户感知不到任何中断。
+        if (pendingWindowShift.current) {
+          const shift = pendingWindowShift.current;
+          pendingWindowShift.current = null;
+          shift();
+          return; // 移窗后会触发新的 flip 事件，进度在那次保存
+        }
 
         if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
         lazyUpdateTimer.current = setTimeout(() => {
@@ -477,9 +470,12 @@ export default function EpubReaderView({
     [pagination.totalPages, onProgressUpdate, pageStore, pageToCharOffset, settingsFingerprint],
   );
 
-  useEffect(() => { return () => { if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current); }; }, []);
-  // 组件卸载时清理 DOM 快照
-  useEffect(() => { return () => { removeSnapshot(); }; }, [removeSnapshot]);
+  // ---- 清理 ----
+  useEffect(() => {
+    return () => {
+      if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
+    };
+  }, []);
 
   // ---- 键盘翻页 ----
   useEffect(() => {
@@ -497,7 +493,6 @@ export default function EpubReaderView({
   const contentParsed = !isLoading && !error;
   const ready = contentParsed && pagination.isReady && pagination.totalPages > 0 && containerSize.w > 0;
   const emptyContent = contentParsed && pagination.isReady && pagination.totalPages === 0 && chaptersMeta.length === 0;
-  const settingsChanged = paginatedSettingsKey !== '' && paginatedSettingsKey !== settingsFingerprint;
 
   // ---- 构建页面数据（全量元数据，用于查找）----
   const chapterPageCounts = useMemo(() => {
@@ -524,7 +519,7 @@ export default function EpubReaderView({
     });
   }, [pagination.totalPages, pagination.chapterPageRanges, chapterPageCounts, containerSize.w, pageWindowSize, windowStart]);
 
-  // ---- 稳定的 children 数组（仅窗口内的页面）----
+  // ---- 稳定的 children 数组 ----
   const stableChildren = useMemo(() => {
     return windowedPages.map((p) => (
       <BookPage
@@ -545,11 +540,6 @@ export default function EpubReaderView({
       />
     ));
   }, [windowedPages, chapters, contentWidth, contentHeight, pagination.totalPages, fontSize, lineHeightVal, fontFamily, theme, pagePadding]);
-
-  // 当前页在窗口内的本地起始位置
-  // 使用 flipStartPage（由 doRemount 设置）而非 startPage（初始进度页），
-  // 确保窗口滑动后 FlipBook 从正确的当前阅读页开始，而不是跳回初始进度页。
-  const localStartPage = flipStartPage >= windowStart ? flipStartPage - windowStart : 0;
 
   return (
     <div ref={containerRef} className={`book-container ${themeClass}`}>
@@ -586,9 +576,8 @@ export default function EpubReaderView({
         ` }} />
       )}
 
-      {windowedPages.length > 0 && containerSize.w > 0 && flipBookKey && (
+      {windowedPages.length > 0 && containerSize.w > 0 && settingsKey && (
         <div
-          ref={bookFrameRef}
           className="book-frame"
           style={{ position: 'relative', opacity: showBook ? 1 : 0, transition: 'opacity 0.3s ease-in' }}
         >
@@ -598,7 +587,7 @@ export default function EpubReaderView({
 
           <PageStoreContext.Provider value={pageStore}>
             <HTMLFlipBook
-              key={flipBookKey}
+              key={settingsKey}
               ref={flipBookRef}
               className="book-flipbook"
               width={pageDimensions.pageW}
@@ -620,7 +609,7 @@ export default function EpubReaderView({
               disableFlipByClick={isMobile}
               clickEventForward={!isMobile}
               swipeDistance={15}
-              startPage={localStartPage}
+              startPage={currentLocalPage}
               startZIndex={2}
               autoSize={false}
               onFlip={handleFlip}
@@ -632,6 +621,50 @@ export default function EpubReaderView({
           </PageStoreContext.Provider>
 
           {!isMobile && <div className="book-spine" />}
+
+          {/* 章节加载指示器：书保持可见，只在书中央显示一个小 loading */}
+          {isFetchingChapters && showBook && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px',
+                borderRadius: 20,
+                background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                backdropFilter: 'blur(8px)',
+                pointerEvents: 'none',
+                transition: 'opacity 0.2s ease',
+              }}
+            >
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  border: `2px solid ${theme === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)'}`,
+                  borderTop: `2px solid ${theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)'}`,
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 11,
+                  opacity: 0.6,
+                  color: theme === 'dark' ? '#fff' : '#333',
+                  fontFamily: 'Georgia, "Times New Roman", "Songti SC", serif',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                加载中…
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -641,8 +674,8 @@ export default function EpubReaderView({
         style={{
           position: 'absolute', inset: 0, zIndex: 30,
           background: theme === 'dark' ? 'rgb(26,23,20)' : theme === 'sepia' ? 'rgb(228,216,191)' : 'rgb(250,247,242)',
-          opacity: (!error && !emptyContent && (!showBook || !pagination.isReady || settingsChanged)) ? 1 : 0,
-          pointerEvents: (!error && !emptyContent && (!showBook || !pagination.isReady || settingsChanged)) ? 'auto' : 'none',
+          opacity: (!error && !emptyContent && (!showBook || !pagination.isReady)) ? 1 : 0,
+          pointerEvents: (!error && !emptyContent && (!showBook || !pagination.isReady)) ? 'auto' : 'none',
           transition: 'opacity 0.15s ease',
         }}
       >

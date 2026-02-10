@@ -41,6 +41,8 @@ export interface ServerChaptersResult {
   totalCharacters: number;
   /** 是否正在加载元数据 */
   isLoading: boolean;
+  /** 是否正在拉取更多章节（预取/兜底加载） */
+  isFetchingChapters: boolean;
   /** 错误信息 */
   error: string | null;
   /** 通知 hook 当前阅读位置（章节索引），触发预取 */
@@ -93,6 +95,8 @@ export function useServerChapters(
   const loadedChaptersRef = useRef<Map<number, ChapterContent>>(new Map());
   // 正在加载的章节范围（防止重复请求）
   const loadingRangesRef = useRef<Set<string>>(new Set());
+  // 是否正在拉取更多章节（state：驱动 UI 展示 loading 指示器）
+  const [isFetchingChapters, setIsFetchingChapters] = useState(false);
   // 当前章节索引（用于预取和内存回收）
   const currentChapterRef = useRef(0);
   // 章节元数据 ref（避免闭包过期）
@@ -133,6 +137,7 @@ export function useServerChapters(
     // 防止重复请求
     if (loadingRangesRef.current.has(actualKey)) return;
     loadingRangesRef.current.add(actualKey);
+    setIsFetchingChapters(true);
 
     try {
       const res = await fetch(`/api/library/chapters?bookId=${bookId}&from=${actualFrom}&to=${actualTo}`);
@@ -153,6 +158,10 @@ export function useServerChapters(
       console.error(`[ServerChapters] 加载章节 ${actualFrom}-${actualTo} 失败:`, err);
     } finally {
       loadingRangesRef.current.delete(actualKey);
+      // 只在没有其他请求时才清除 fetching 状态
+      if (loadingRangesRef.current.size === 0) {
+        setIsFetchingChapters(false);
+      }
     }
   }, [bookId]);
 
@@ -339,6 +348,7 @@ export function useServerChapters(
     styles,
     totalCharacters,
     isLoading,
+    isFetchingChapters,
     error,
     updateCurrentChapter,
     isChapterLoaded,
