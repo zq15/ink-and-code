@@ -31,7 +31,12 @@ interface ReaderPageProps {
 export default function ReaderPage({ params }: ReaderPageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const { book, isLoading, isValidating } = useBookDetail(id);
+  const { book, isLoading, isValidating, mutate: mutateBook } = useBookDetail(id);
+
+  // 进入阅读页时强制拉取最新进度，避免用 SWR 缓存（可能是上次的 progress.currentLocation = null）
+  useEffect(() => {
+    if (id) mutateBook();
+  }, [id, mutateBook]);
   const { settings, mutate: mutateSettings } = useReadingSettings();
   const { saveSettings } = useSaveReadingSettings();
   const { saveProgress } = useSaveProgress();
@@ -39,15 +44,10 @@ export default function ReaderPage({ params }: ReaderPageProps) {
   const { highlights, addHighlight, deleteHighlight, mutate: mutateHighlights } = useHighlights(id);
 
   // ---- 首次加载保护 ----
-  // SWR 可能先返回缓存的旧进度（stale），再验证得到最新进度。
-  // 解决：等 SWR 验证完成后才渲染阅读器（dataReady）。
-  // 同时保持一个全屏遮罩直到 EpubReaderView 发出 onReady（readerReady），
-  // 避免 loading → 排版中 → 空白页 → 正确页 的多次跳动。
-  const initialLoadDoneRef = useRef(false);
-  if (!isValidating && book) {
-    initialLoadDoneRef.current = true;
-  }
-  const dataReady = initialLoadDoneRef.current && !!book;
+  // 进入阅读页时已用 useEffect 触发 mutateBook()，这里必须等验证完成再渲染阅读器，
+  // 否则会用到 SWR 缓存的旧 progress（currentLocation = null），恢复成第一页。
+  // 同时保持全屏遮罩直到 EpubReaderView 发出 onReady（readerReady），避免闪烁。
+  const dataReady = !!book && !isValidating;
   const [readerReady, setReaderReady] = useState(false);
   const handleReaderReady = useCallback(() => setReaderReady(true), []);
 
@@ -229,7 +229,7 @@ export default function ReaderPage({ params }: ReaderPageProps) {
       window.removeEventListener('pagehide', handlePageHide);
     };
   // 空依赖：只在 mount/unmount 时运行，通过 ref 读取最新值
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   // 恢复进度

@@ -215,27 +215,41 @@ export default function EpubReaderView({
   const pageToCharOffset = useCallback((page: number): number => {
     if (totalTextLength === 0 || pagination.totalPages === 0) return 0;
     const info = getChapterForPage(page, pagination.chapterPageRanges);
-    if (!info) return 0;
-    const chIdx = info.chapterIndex;
-    const chPages = pagination.chapterPageRanges[chIdx]?.pageCount ?? 1;
-    const ratio = info.pageInChapter / Math.max(1, chPages);
-    return Math.round(chapterCumOffsets[chIdx] + ratio * chapterTextLengths[chIdx]);
+    if (info) {
+      // 精确计算（chapterPageRanges 已就绪）
+      const chIdx = info.chapterIndex;
+      const chPages = pagination.chapterPageRanges[chIdx]?.pageCount ?? 1;
+      const ratio = info.pageInChapter / Math.max(1, chPages);
+      return Math.round(chapterCumOffsets[chIdx] + ratio * chapterTextLengths[chIdx]);
+    }
+    // 兜底：chapterPageRanges 尚未就绪时，按比例估算
+    const ratio = page / Math.max(1, pagination.totalPages - 1);
+    return Math.round(ratio * totalTextLength);
   }, [totalTextLength, pagination.totalPages, pagination.chapterPageRanges, chapterCumOffsets, chapterTextLengths]);
 
   const charOffsetToPage = useCallback((offset: number): number => {
     if (totalTextLength === 0 || pagination.totalPages === 0 || offset <= 0) return 0;
-    let chIdx = 0;
-    for (let i = 1; i < chapterCumOffsets.length; i++) {
-      if (offset < chapterCumOffsets[i]) { chIdx = i - 1; break; }
-      chIdx = i - 1;
+
+    // 尝试精确计算
+    if (pagination.chapterPageRanges.length > 0) {
+      let chIdx = 0;
+      for (let i = 1; i < chapterCumOffsets.length; i++) {
+        if (offset < chapterCumOffsets[i]) { chIdx = i - 1; break; }
+        chIdx = i - 1;
+      }
+      const localOffset = offset - chapterCumOffsets[chIdx];
+      const chTextLen = chapterTextLengths[chIdx] || 1;
+      const ratio = Math.min(localOffset / chTextLen, 1);
+      const range = pagination.chapterPageRanges[chIdx];
+      if (range) {
+        const pageInChapter = Math.min(Math.round(ratio * range.pageCount), range.pageCount - 1);
+        return Math.min(range.startPage + pageInChapter, pagination.totalPages - 1);
+      }
     }
-    const localOffset = offset - chapterCumOffsets[chIdx];
-    const chTextLen = chapterTextLengths[chIdx] || 1;
-    const ratio = Math.min(localOffset / chTextLen, 1);
-    const range = pagination.chapterPageRanges[chIdx];
-    if (!range) return 0;
-    const pageInChapter = Math.min(Math.round(ratio * range.pageCount), range.pageCount - 1);
-    return Math.min(range.startPage + pageInChapter, pagination.totalPages - 1);
+
+    // 兜底：chapterPageRanges 尚未就绪时，按比例估算
+    const ratio = Math.min(offset / totalTextLength, 1);
+    return Math.min(Math.round(ratio * (pagination.totalPages - 1)), pagination.totalPages - 1);
   }, [totalTextLength, pagination.totalPages, pagination.chapterPageRanges, chapterCumOffsets, chapterTextLengths]);
 
   // ---- 解析保存的阅读进度 ----
@@ -262,8 +276,10 @@ export default function EpubReaderView({
   const startPage = useMemo(() => {
     if (!pagination.isReady || pagination.totalPages === 0) return 0;
     if (savedCharOffset <= 0) return 0;
-    return charOffsetToPage(savedCharOffset);
-  }, [pagination.isReady, pagination.totalPages, savedCharOffset, charOffsetToPage]);
+    const page = charOffsetToPage(savedCharOffset);
+    console.log('[EpubReader] 恢复进度', { initialLocation, savedCharOffset, startPage: page, totalPages: pagination.totalPages, totalTextLength, chapterPageRangesLen: pagination.chapterPageRanges.length });
+    return page;
+  }, [pagination.isReady, pagination.totalPages, savedCharOffset, charOffsetToPage, initialLocation, totalTextLength, pagination.chapterPageRanges.length]);
 
   // ---- 主题 & 排版设置 ----
   const theme = settings?.theme || 'light';
@@ -399,11 +415,23 @@ export default function EpubReaderView({
       flipTargetRef.current = globalPage;
       currentPageRef.current = globalPage;
 
-      if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
       pageStore.setPage(globalPage);
-      // 同步 startPage 给库：确保后续 updateFromHtml（章节加载触发）
-      // 能定位到用户当前页面，而非跳回旧位置。
       setCurrentLocalPage(localPage);
+
+      // ---- 防抖保存阅读进度 ----
+      // 进度保存放在 handleFlip（而非 handleChangeState），因为 flip 事件
+      // 在每次翻页时必定触发，比 changeState 的 'read' 更可靠。
+      // 防抖 800ms：快速翻页时只保存最后一次位置。
+      if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
+      lazyUpdateTimer.current = setTimeout(() => {
+        if (pagination.totalPages > 0) {
+          const gp = currentPageRef.current;
+          const pct = Math.round((gp / Math.max(1, pagination.totalPages - 1)) * 100);
+          const charOffset = pageToCharOffset(gp);
+          console.log('[EpubReader] 保存进度', { globalPage: gp, charOffset, pct, totalPages: pagination.totalPages, chapterPageRangesLen: pagination.chapterPageRanges.length });
+          onProgressUpdateRef.current?.(pct, `char:${charOffset}`, { pageNumber: gp, settingsFingerprint });
+        }
+      }, 800);
 
       // 章节预取
       const info = getChapterForPage(globalPage, pagination.chapterPageRanges);
@@ -416,11 +444,7 @@ export default function EpubReaderView({
         }
       }
 
-      // ---- 窗口滑动检测（类虚拟列表策略） ----
-      // 接近窗口边界时，不立即移窗（会打断翻页动画 → 卡顿），
-      // 而是记录"待移窗"，等 handleChangeState 收到 state === 'read'
-      //（动画结束、书页静止）时再执行。
-      // 这样窗口滑动永远发生在"空闲帧"，不打断任何动画，零卡顿。
+      // ---- 窗口滑动检测 ----
       const winEnd = windowStart + pageWindowSize;
       const nearStart = localPage < SHIFT_THRESHOLD && windowStart > 0;
       const nearEnd = localPage > (winEnd - windowStart) - SHIFT_THRESHOLD && winEnd < pagination.totalPages;
@@ -435,39 +459,23 @@ export default function EpubReaderView({
         };
       }
     },
-    [pageStore, pagination.chapterPageRanges, pagination.totalPages, updateCurrentChapter, isChapterLoaded, ensureChaptersLoaded, chaptersMeta.length, pageWindowSize, windowStart],
+    [pageStore, pagination.chapterPageRanges, pagination.totalPages, updateCurrentChapter, isChapterLoaded, ensureChaptersLoaded, chaptersMeta.length, pageWindowSize, windowStart, pageToCharOffset, settingsFingerprint],
   );
 
   const handleChangeState = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (e: any) => {
       if (e.data === 'read') {
-        const globalPage = flipTargetRef.current;
-        currentPageRef.current = globalPage;
-
         // ---- 执行待定的窗口滑动 ----
-        // 此刻翻页动画刚结束，书页静止，是最佳移窗时机。
-        // updateFromHtml 的 finishAnimation() 此时是空操作（没有动画在跑），
-        // 页面替换在同一帧内同步完成 → 用户感知不到任何中断。
+        // 翻页动画结束，书页静止，是最佳移窗时机
         if (pendingWindowShift.current) {
           const shift = pendingWindowShift.current;
           pendingWindowShift.current = null;
           shift();
-          return; // 移窗后会触发新的 flip 事件，进度在那次保存
         }
-
-        if (lazyUpdateTimer.current) clearTimeout(lazyUpdateTimer.current);
-        lazyUpdateTimer.current = setTimeout(() => {
-          pageStore.setPage(globalPage);
-          if (pagination.totalPages > 0) {
-            const pct = Math.round((globalPage / Math.max(1, pagination.totalPages - 1)) * 100);
-            const charOffset = pageToCharOffset(globalPage);
-            onProgressUpdate?.(pct, `char:${charOffset}`, { pageNumber: globalPage, settingsFingerprint });
-          }
-        }, 300);
       }
     },
-    [pagination.totalPages, onProgressUpdate, pageStore, pageToCharOffset, settingsFingerprint],
+    [],
   );
 
   // ---- 清理 ----

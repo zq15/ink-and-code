@@ -49,12 +49,18 @@ export async function GET(request: Request) {
       ]);
     }
 
-    return success({
+    const payload: Record<string, unknown> = {
       ...book,
       progress,
       bookmarks,
       highlights,
-    });
+    };
+    // 开发环境：方便在 Network 里确认请求是否带登录态、以及是否查到进度
+    if (process.env.NODE_ENV === 'development') {
+      payload._debug = { authenticated: !!userId, hasProgress: progress != null };
+    }
+
+    return success(payload);
   } catch (error) {
     console.error('Failed to get book detail:', error);
     return ApiError.internal('获取书籍详情失败');
