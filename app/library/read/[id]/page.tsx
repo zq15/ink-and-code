@@ -54,8 +54,11 @@ export default function ReaderPage({ params }: ReaderPageProps) {
 
   const [showToolbar, setShowToolbar] = useState(true);
   const [showSidebar, setShowSidebar] = useState<'toc' | 'bookmarks' | 'highlights' | 'settings' | null>(null);
-  const [percentage, setPercentage] = useState(0);
-  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  // 进度值存 ref（每次翻页更新，零开销），UI 显示用低频 state（≤1次/秒）
+  const percentageRef = useRef(0);
+  const currentLocationRef = useRef<string | null>(null);
+  const [displayPercentage, setDisplayPercentage] = useState(0);
+  const displayPctTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // 自动隐藏工具栏（移动端始终生效，桌面端仅全屏时生效）
@@ -165,10 +168,10 @@ export default function ReaderPage({ params }: ReaderPageProps) {
   const readTimeRef = useRef(0);
   const lastSaveRef = useRef(Date.now());
 
-  // 自动保存进度（30s 间隔）
+  // 自动保存进度（30s 间隔）— 从 ref 读取最新值，不依赖 state
   useEffect(() => {
     const interval = setInterval(() => {
-      if (book && percentage > 0) {
+      if (book && percentageRef.current > 0) {
         const now = Date.now();
         const delta = Math.floor((now - lastSaveRef.current) / 1000);
         lastSaveRef.current = now;
@@ -176,8 +179,8 @@ export default function ReaderPage({ params }: ReaderPageProps) {
 
         saveProgress({
           bookId: id,
-          currentLocation: currentLocation || undefined,
-          percentage,
+          currentLocation: currentLocationRef.current || undefined,
+          percentage: percentageRef.current,
           readTimeDelta: delta,
           ...progressExtraRef.current,
         }).catch(console.error);
@@ -185,12 +188,14 @@ export default function ReaderPage({ params }: ReaderPageProps) {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [book, id, percentage, currentLocation, saveProgress]);
+  }, [book, id, saveProgress]);
 
   // ---- 离开页面时保存进度 ----
   // 使用 ref 持有最新值，避免 useEffect 闭包捕获过期数据
-  const saveDataRef = useRef({ book, id, percentage, currentLocation });
-  saveDataRef.current = { book, id, percentage, currentLocation };
+  const saveDataRef = useRef({ book, id, percentage: percentageRef.current, currentLocation: currentLocationRef.current });
+  useEffect(() => {
+    saveDataRef.current = { book, id, percentage: percentageRef.current, currentLocation: currentLocationRef.current };
+  });
 
   useEffect(() => {
     const doSave = () => {
@@ -236,8 +241,9 @@ export default function ReaderPage({ params }: ReaderPageProps) {
   // 恢复进度
   useEffect(() => {
     if (book?.progress) {
-      setPercentage(book.progress.percentage);
-      setCurrentLocation(book.progress.currentLocation);
+      percentageRef.current = book.progress.percentage;
+      currentLocationRef.current = book.progress.currentLocation;
+      setDisplayPercentage(book.progress.percentage);
     }
   }, [book?.progress]);
 
@@ -247,27 +253,34 @@ export default function ReaderPage({ params }: ReaderPageProps) {
   const debounceSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleProgressUpdate = useCallback((pct: number, loc?: string, extra?: { pageNumber?: number; settingsFingerprint?: string }) => {
-    setPercentage(pct);
-    if (loc) setCurrentLocation(loc);
+    // 存入 ref（零开销，不触发任何重渲染）
+    percentageRef.current = pct;
+    if (loc) currentLocationRef.current = loc;
     if (extra) progressExtraRef.current = extra;
 
-    // 防抖保存到后端：每次调用重置计时器，1.5 秒后执行（避免频繁保存影响翻页性能）
-    // 通过 ref 读取最新值，避免依赖 state 导致回调频繁重建
+    // 低频更新进度条 UI（最多 1 次/秒）— 不影响翻页性能
+    if (!displayPctTimer.current) {
+      displayPctTimer.current = setTimeout(() => {
+        displayPctTimer.current = undefined;
+        setDisplayPercentage(percentageRef.current);
+      }, 1000);
+    }
+
+    // 防抖保存到后端：每次调用重置计时器，2 秒后执行
     if (debounceSaveRef.current) clearTimeout(debounceSaveRef.current);
     debounceSaveRef.current = setTimeout(() => {
       const now = Date.now();
       const delta = Math.floor((now - lastSaveRef.current) / 1000);
       lastSaveRef.current = now;
-      const data = saveDataRef.current;
       saveProgress({
-        bookId: data.id,
-        currentLocation: loc || data.currentLocation || undefined,
-        percentage: pct,
+        bookId: id,
+        currentLocation: currentLocationRef.current || undefined,
+        percentage: percentageRef.current,
         readTimeDelta: delta,
         ...progressExtraRef.current,
       }).catch(console.error);
-    }, 1500);
-  }, [saveProgress]);
+    }, 2000);
+  }, [id, saveProgress]);
 
   const handleToggleToolbar = useCallback(() => {
     setShowToolbar(prev => {
@@ -807,7 +820,7 @@ export default function ReaderPage({ params }: ReaderPageProps) {
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
-              width: `${percentage}%`,
+              width: `${displayPercentage}%`,
               background: readerTheme === 'dark'
                 ? 'linear-gradient(90deg, #8a7050, #b8956e)'
                 : 'linear-gradient(90deg, #c4996c, #d4aa7e)'
@@ -818,7 +831,7 @@ export default function ReaderPage({ params }: ReaderPageProps) {
           className="text-[11px] tabular-nums shrink-0 opacity-40"
           style={{ fontFamily: 'Georgia, "Times New Roman", serif', fontWeight: 500 }}
         >
-          {Math.round(percentage)}%
+          {Math.round(displayPercentage)}%
         </span>
       </div>
 
