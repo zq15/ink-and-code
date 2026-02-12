@@ -89,10 +89,20 @@ interface EpubReaderViewProps {
   onReady?: () => void;
 }
 
-function parseInitialCharOffset(loc?: string): number {
-  if (!loc) return 0;
-  if (loc.startsWith('char:')) { const n = parseInt(loc.replace('char:', ''), 10); return isNaN(n) || n < 0 ? 0 : n; }
-  return 0;
+/**
+ * 解析进度位置字符串。
+ * 格式："char:25000|page:50|fp:16_1.8_system_376_527"
+ * 向后兼容旧格式 "char:25000"（无 page/fp 部分）。
+ */
+function parseInitialLocation(loc?: string): { charOffset: number; pageNumber: number; settingsFingerprint: string } {
+  if (!loc) return { charOffset: 0, pageNumber: -1, settingsFingerprint: '' };
+  let charOffset = 0, pageNumber = -1, fp = '';
+  for (const part of loc.split('|')) {
+    if (part.startsWith('char:')) { const n = parseInt(part.slice(5), 10); if (!isNaN(n) && n >= 0) charOffset = n; }
+    else if (part.startsWith('page:')) { const n = parseInt(part.slice(5), 10); if (!isNaN(n) && n >= 0) pageNumber = n; }
+    else if (part.startsWith('fp:')) { fp = part.slice(3); }
+  }
+  return { charOffset, pageNumber, settingsFingerprint: fp };
 }
 
 export default function EpubReaderView({
@@ -119,7 +129,8 @@ export default function EpubReaderView({
     return () => ro.disconnect();
   }, []);
 
-  const initialCharOffset = useMemo(() => parseInitialCharOffset(initialLocation), [initialLocation]);
+  const parsedLocation = useMemo(() => parseInitialLocation(initialLocation), [initialLocation]);
+  const initialCharOffset = parsedLocation.charOffset;
 
   // ---- 服务端章节 ----
   const {
@@ -185,25 +196,33 @@ export default function EpubReaderView({
     return Math.min(Math.round((offset / totalTextLength) * (pagination.totalPages - 1)), pagination.totalPages - 1);
   }, [totalTextLength, pagination.totalPages, pagination.chapterPageRanges, chapterCumOffsets, chapterTextLengths]);
 
-  // ---- 进度恢复 ----
-  const savedCharOffset = useMemo(() => {
-    if (!initialLocation) return 0;
-    if (initialLocation.startsWith('char:')) { const n = parseInt(initialLocation.replace('char:', ''), 10); return isNaN(n) || n < 0 ? 0 : n; }
-    return 0;
-  }, [initialLocation]);
-
-  const startPage = useMemo(() => {
-    if (!pagination.isReady || pagination.totalPages === 0 || savedCharOffset <= 0) return 0;
-    return charOffsetToPage(savedCharOffset);
-  }, [pagination.isReady, pagination.totalPages, savedCharOffset, charOffsetToPage]);
-
-  // ---- 排版设置 ----
+  // ---- 排版设置（提前到 startPage 之前，精确恢复需要比较 settingsFingerprint） ----
   const theme = settings?.theme || 'light';
   const themeClass = theme === 'dark' ? 'book-theme-dark' : theme === 'sepia' ? 'book-theme-sepia' : '';
   const fontSize = settings?.fontSize ?? 16;
   const lineHeightVal = settings?.lineHeight ?? 1.8;
   const fontFamily = settings?.fontFamily ?? 'system';
   const settingsFingerprint = `${fontSize}_${lineHeightVal}_${fontFamily}_${pageDimensions.pageW}_${pageDimensions.pageH}`;
+
+  // ---- 进度恢复 ----
+  // 位置格式："char:25000|page:50|fp:16_1.8_system_376_527"
+  //  - char: 字符偏移（跨设置近似恢复）
+  //  - page: 精确页码（同设置精确恢复）
+  //  - fp:   排版指纹（判断页码是否仍有效）
+  const savedCharOffset = parsedLocation.charOffset;
+  const savedPageNumber = parsedLocation.pageNumber;
+  const savedSettingsFp = parsedLocation.settingsFingerprint;
+
+  const startPage = useMemo(() => {
+    if (!pagination.isReady || pagination.totalPages === 0) return 0;
+    // 精确恢复：排版设置未变 + 已保存页码有效 → 直接使用页码（零偏差）
+    if (savedPageNumber >= 0 && savedSettingsFp === settingsFingerprint && savedPageNumber < pagination.totalPages) {
+      return savedPageNumber;
+    }
+    // 降级恢复：通过字符偏移近似定位（设置变更或旧格式数据）
+    if (savedCharOffset <= 0) return 0;
+    return charOffsetToPage(savedCharOffset);
+  }, [pagination.isReady, pagination.totalPages, savedPageNumber, savedSettingsFp, settingsFingerprint, savedCharOffset, charOffsetToPage]);
 
   // ---- 外部页面存储 ----
   const [pageStore] = useState(createPageStore);
@@ -242,11 +261,13 @@ export default function EpubReaderView({
   useEffect(() => {
     if (!pagination.isReady) return;
     if (!initializedRef.current && isLoading) return;
-    if (!initializedRef.current && savedCharOffset > 0 && pagination.chapterPageRanges.length === 0) return;
+    // 等待 chapterPageRanges 的前提：需要通过 charOffset 近似定位（无精确页码可用）
+    const canUseExactPage = savedPageNumber >= 0 && savedSettingsFp === settingsFingerprint;
+    if (!initializedRef.current && !canUseExactPage && savedCharOffset > 0 && pagination.chapterPageRanges.length === 0) return;
 
     const isSettingsChange = prevSettingsFpRef.current !== '' && prevSettingsFpRef.current !== settingsFingerprint;
     const isProgressRestore = initializedRef.current && initialLocation !== prevInitialLocationRef.current && startPage > 0;
-    const isLateProgressApply = initializedRef.current && startPage > 0 && currentPageRef.current === 0 && savedCharOffset > 0;
+    const isLateProgressApply = initializedRef.current && startPage > 0 && currentPageRef.current === 0;
 
     prevSettingsFpRef.current = settingsFingerprint;
 
@@ -280,7 +301,8 @@ export default function EpubReaderView({
       setShowBook(false);
       if (pagination.totalPages > 0) {
         const pct = Math.round((gp / Math.max(1, pagination.totalPages - 1)) * 100);
-        onProgressUpdateRef.current?.(pct, `char:${pageToCharOffset(gp)}`, { pageNumber: gp, settingsFingerprint });
+        const charOff = pageToCharOffset(gp);
+        onProgressUpdateRef.current?.(pct, `char:${charOff}|page:${gp}|fp:${settingsFingerprint}`, { pageNumber: gp, settingsFingerprint });
       }
     } else if (isProgressRestore || isLateProgressApply) {
       if (isProgressRestore) prevInitialLocationRef.current = initialLocation;
@@ -295,7 +317,7 @@ export default function EpubReaderView({
     } else if (pagination.totalPages !== prevTotalRef.current) {
       prevTotalRef.current = pagination.totalPages;
     }
-  }, [pagination.isReady, isLoading, pagination.totalPages, pagination.chapterPageRanges.length, startPage, savedCharOffset, initialLocation, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset, pageWindowSize]);
+  }, [pagination.isReady, isLoading, pagination.totalPages, pagination.chapterPageRanges.length, startPage, savedCharOffset, savedPageNumber, savedSettingsFp, initialLocation, pageDimensions.pageW, pageDimensions.pageH, fontSize, lineHeightVal, fontFamily, pageStore, settingsFingerprint, pageToCharOffset, pageWindowSize]);
 
   // ---- 淡入 ----
   useEffect(() => {
@@ -316,35 +338,35 @@ export default function EpubReaderView({
   useEffect(() => { chaptersMetaLenRef.current = chaptersMeta.length; }, [chaptersMeta.length]);
   useEffect(() => { pageToCharOffsetRef.current = pageToCharOffset; }, [pageToCharOffset]);
 
-  // ---- 翻页（性能优化：延迟 store 更新，不在动画帧中触发子组件重渲染） ----
+  // ---- 翻页（所有副作用延迟到 rAF，不在翻页动画帧中阻塞） ----
   const handleFlip = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (e: any) => {
       const localPage = e.data as number;
       const ws = windowStartRef.current;
-      const globalPage = localPage + ws;
+      const globalPage = Math.max(0, localPage + ws);
       currentPageRef.current = globalPage;
       // 仅更新 ref，不触发 React 重渲染。
       // 库内部已经在正确页面，不需要 state → startPage → turnToPage 链。
       currentLocalPageRef.current = localPage;
 
-      // 延迟通知 BookPage 子组件更新 isNear，避免在翻页动画帧中触发重渲染导致卡顿。
-      // 目标页内容已在 lazyWindow 内，无需即时更新。
+      // 所有副作用延迟到下一帧，不在翻页动画帧中触发重渲染或计算
       if (flipRafRef.current) cancelAnimationFrame(flipRafRef.current);
       flipRafRef.current = requestAnimationFrame(() => {
         // 批量更新 page + initialPage，只触发一次 notify
         pageStore.setBoth(globalPage);
+
+        // 通知上层进度（上层自行防抖 2s，不阻塞翻页）
+        const totalPages = paginationRef.current.totalPages;
+        if (totalPages > 0 && onProgressUpdateRef.current) {
+          const pct = Math.round((globalPage / Math.max(1, totalPages - 1)) * 100);
+          const charOffset = pageToCharOffsetRef.current(globalPage);
+          const fp = settingsFingerprintRef.current;
+          onProgressUpdateRef.current(pct, `char:${charOffset}|page:${globalPage}|fp:${fp}`, { pageNumber: globalPage, settingsFingerprint: fp });
+        }
       });
 
-      // 通知上层（上层自行防抖，不阻塞）
-      const totalPages = paginationRef.current.totalPages;
-      if (totalPages > 0 && onProgressUpdateRef.current) {
-        const pct = Math.round((globalPage / Math.max(1, totalPages - 1)) * 100);
-        const charOffset = pageToCharOffsetRef.current(globalPage);
-        onProgressUpdateRef.current(pct, `char:${charOffset}`, { pageNumber: globalPage, settingsFingerprint: settingsFingerprintRef.current });
-      }
-
-      // 章节预取
+      // 章节预取（轻量操作，同步执行）
       const chapterPageRanges = paginationRef.current.chapterPageRanges;
       const info = getChapterForPage(globalPage, chapterPageRanges);
       if (info) {
@@ -354,19 +376,37 @@ export default function EpubReaderView({
         }
       }
 
-      // 窗口滑动检测
+      // 窗口滑动检测（闭包内不捕获易变值，全部从 ref 读取）
       const pws = pageWindowSizeRef.current;
       const nearStart = localPage < SHIFT_THRESHOLD && ws > 0;
-      const nearEnd = localPage > pws - SHIFT_THRESHOLD && ws + pws < totalPages;
+      const nearEnd = localPage > pws - SHIFT_THRESHOLD && ws + pws < paginationRef.current.totalPages;
       if (nearStart || nearEnd) {
         pendingWindowShift.current = () => {
           const gp = currentPageRef.current;
-          const newWin = calcPageWindow(gp, totalPages, pws);
+          // 从 ref 读取最新值，避免使用翻页时捕获的过期 totalPages / pws
+          const tp = paginationRef.current.totalPages;
+          const pw = pageWindowSizeRef.current;
+          if (tp === 0) return;
+
+          // 短暂隐藏翻书区域，避免 children 重建时的视觉闪烁
+          const frame = document.querySelector('.book-frame') as HTMLElement | null;
+          if (frame) { frame.style.transition = 'none'; frame.style.opacity = '0'; }
+
+          const newWin = calcPageWindow(gp, tp, pw);
+          // 安全边界钳制，防止负索引或越界
+          const lp = Math.max(0, Math.min(gp - newWin.start, pw - 1));
           setWindowStart(newWin.start);
           windowStartRef.current = newWin.start;
-          currentLocalPageRef.current = gp - newWin.start;
-          setCurrentLocalPage(gp - newWin.start);
+          currentLocalPageRef.current = lp;
+          setCurrentLocalPage(lp);
           pageStore.setBoth(gp);
+
+          // React 渲染完成后恢复可见
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (frame) { frame.style.transition = 'opacity 0.15s ease-in'; frame.style.opacity = '1'; }
+            });
+          });
         };
       }
     },

@@ -44,6 +44,8 @@ export interface ReadingProgress {
   percentage: number;
   lastReadAt: string;
   totalReadTime: number;
+  pageNumber?: number | null;
+  settingsFingerprint?: string | null;
 }
 
 export interface BookmarkItem {
