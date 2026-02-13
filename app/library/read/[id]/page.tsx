@@ -1,3 +1,12 @@
+/*
+ * :date created: 2026-02-07 11:33:11
+ * :file description: 
+ * :name: /ink-and-code/app/library/read/[id]/page.tsx
+ * :date last edited: 2026-02-13 10:11:21
+ * :last editor: PTC
+ * :author: PTC
+ * :copyright: (c) 2026, Tungee
+ */
 'use client';
 
 import { use, useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -191,15 +200,18 @@ export default function ReaderPage({ params }: ReaderPageProps) {
   }, [book, id, saveProgress]);
 
   // ---- 离开页面时保存进度 ----
-  // 使用 ref 持有最新值，避免 useEffect 闭包捕获过期数据
-  const saveDataRef = useRef({ book, id, percentage: percentageRef.current, currentLocation: currentLocationRef.current });
+  // saveDataRef 仅持有 props/state（book, id），闭包内无法直接引用。
+  // percentage / currentLocation 从各自 ref 实时读取，避免 render 快照滞后。
+  const saveDataRef = useRef({ book, id });
   useEffect(() => {
-    saveDataRef.current = { book, id, percentage: percentageRef.current, currentLocation: currentLocationRef.current };
+    saveDataRef.current = { book, id };
   });
 
   useEffect(() => {
     const doSave = () => {
-      const { book: b, id: bookId, percentage: pct, currentLocation: loc } = saveDataRef.current;
+      const { book: b, id: bookId } = saveDataRef.current;
+      const pct = percentageRef.current;
+      const loc = currentLocationRef.current;
       if (!b || (!loc && pct <= 0)) return;
       const delta = Math.floor((Date.now() - lastSaveRef.current) / 1000);
       navigator.sendBeacon(
