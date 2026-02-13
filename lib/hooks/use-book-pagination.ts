@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ChapterData, ChapterMeta } from './use-server-chapters';
 import type { ReadingSettingsData } from './use-library';
+import { buildBlockMap } from '@/lib/reading-anchor';
+import type { ChapterBlockMap } from '@/lib/reading-anchor';
 
 export interface ChapterPageRange {
   chapterIndex: number;
@@ -15,6 +17,8 @@ export interface ChapterPageRange {
 export interface PaginationResult {
   totalPages: number;
   chapterPageRanges: ChapterPageRange[];
+  /** 每个已测量章节的块级元素→页码映射（用于锚点定位） */
+  blockMaps: ChapterBlockMap[];
   pageWidth: number;
   pageHeight: number;
   isReady: boolean;
@@ -46,6 +50,7 @@ export function useBookPagination(
   const [result, setResult] = useState<PaginationResult>({
     totalPages: 0,
     chapterPageRanges: [],
+    blockMaps: [],
     pageWidth: 0,
     pageHeight: 0,
     isReady: false,
@@ -74,6 +79,7 @@ export function useBookPagination(
       setResult({
         totalPages: 0,
         chapterPageRanges: [],
+        blockMaps: [],
         pageWidth: pageContentWidth,
         pageHeight: pageContentHeight,
         isReady: true,
@@ -107,6 +113,7 @@ export function useBookPagination(
 
       // ---- 第一轮：精确测量已加载的章节 ----
       const measuredRanges: { chapterIndex: number; pageCount: number; charLength: number }[] = [];
+      const blockMaps: ChapterBlockMap[] = [];
       let totalMeasuredChars = 0;
       let totalMeasuredPages = 0;
 
@@ -162,6 +169,10 @@ export function useBookPagination(
         // 测量页数：scrollWidth 除以 columnWidth
         const scrollW = contentEl.scrollWidth;
         const pageCount = Math.max(1, Math.ceil((scrollW - 2) / pageContentWidth));
+
+        // 构建块级元素→页码映射（用于锚点定位）
+        const chapterBlockMap = buildBlockMap(contentEl, pageContentWidth, i);
+        blockMaps.push(chapterBlockMap);
 
         const charLength = chaptersMeta[i]?.charLength ?? chapter.html.replace(/<[^>]*>/g, '').length;
         measuredRanges.push({ chapterIndex: i, pageCount, charLength });
@@ -224,6 +235,7 @@ export function useBookPagination(
       setResult({
         totalPages: cumulativePages,
         chapterPageRanges: ranges,
+        blockMaps,
         pageWidth: pageContentWidth,
         pageHeight: pageContentHeight,
         isReady: true,
@@ -233,6 +245,7 @@ export function useBookPagination(
       setResult({
         totalPages: 0,
         chapterPageRanges: [],
+        blockMaps: [],
         pageWidth: pageContentWidth,
         pageHeight: pageContentHeight,
         isReady: true,
